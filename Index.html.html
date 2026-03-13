@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { background-color: #f4f7f6; font-size: 0.9rem; }
+    .nav-tabs .nav-link { cursor: pointer; }
+    .btn-mov { background-color: #6c757d; color: white; margin-right: 5px; margin-bottom: 5px; font-weight: bold; border: none; }
+    .btn-mov.active { background-color: #dc3545 !important; color: white !important; }
+    .readonly-field { background-color: #e9ecef !important; }
+    .table-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .total-bar { background: #343a40; color: white; padding: 10px; border-radius: 5px; margin-top: 10px; }
+    .hidden { display: none; }
+    .autocomplete-items {
+      position: absolute; border: 1px solid #d4d4d4; z-index: 99;
+      top: 100%; left: 0; right: 0; background-color: #fff; max-height: 200px; overflow-y: auto;
+    }
+    .autocomplete-item { padding: 10px; cursor: pointer; }
+    .autocomplete-item:hover { background-color: #e9e9e9; }
+  </style>
+</head>
+<body>
+
+<div class="container-fluid mt-3">
+  <ul class="nav nav-tabs mb-3" id="mainTabs">
+    <li class="nav-item"><a class="nav-link active" onclick="showTab('captura')">Captura</a></li>
+    <li class="nav-item"><a class="nav-link" onclick="showTab('consulta')">Consulta</a></li>
+  </ul>
+
+  <!-- PESTAÑA CAPTURA -->
+  <div id="tab-captura" class="table-container">
+    <div class="row mb-3 align-items-end">
+      <div class="col-md-2">
+        <label>FECHA</label>
+        <input type="date" id="head-fecha" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label>ENVIO</label>
+        <input type="text" id="head-envio" class="form-control">
+      </div>
+      <div class="col-md-6">
+        <label class="d-block">MOVIMIENTO</label>
+        <div id="movimiento-group">
+          <button class="btn btn-mov" onclick="setMov(this)">MAQUILA</button>
+          <button class="btn btn-mov" onclick="setMov(this)">ALAMBRES</button>
+          <button class="btn btn-mov" onclick="setMov(this)">DEVOLUCIONES</button>
+          <button class="btn btn-mov" onclick="setMov(this)">REPROCESOS</button>
+          <button class="btn btn-mov" onclick="setMov(this)">ACEITES y LUB</button>
+          <button class="btn btn-mov" onclick="setMov(this)">ENTRADAS ETSA</button>
+          <button class="btn btn-mov" onclick="setMov(this)">ENTRADAS PINTURA</button>
+          <button class="btn btn-mov" onclick="setMov(this)">OTROS</button>
+        </div>
+      </div>
+      <div class="col-md-2 text-end">
+        <button class="btn btn-info" onclick="openCatalogoModal()">Catálogo</button>
+      </div>
+    </div>
+
+    <table class="table table-bordered align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th style="width: 150px;">CÓDIGO (Buscar)</th>
+          <th>DESCRIPCIÓN / DATOS</th>
+          <th style="width: 120px;">PEDIDO</th>
+          <th style="width: 130px;">ORIGEN</th>
+          <th style="width: 100px;">CANT.</th>
+          <th style="width: 110px;">UNIDAD</th>
+          <th style="width: 100px;">KILOS</th>
+          <th style="width: 100px;">K. REC</th>
+          <th>COMENTARIOS</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-captura">
+        <!-- Fila base -->
+        <tr id="row-1">
+          <td class="position-relative">
+            <input type="text" class="form-control" onkeyup="searchCodigo(this)" placeholder="Escriba código...">
+            <div class="autocomplete-items hidden"></div>
+          </td>
+          <td><small id="row-1-desc" class="text-muted d-block">Seleccione código...</small></td>
+          <td><input type="text" class="form-control" data-field="pedido"></td>
+          <td>
+            <select class="form-select" data-field="origen">
+              <option>REYES</option><option>CEDIS</option><option>ETSA</option><option>METCOMEX</option><option>OTRO</option>
+            </select>
+          </td>
+          <td><input type="number" class="form-control" data-field="cantidad"></td>
+          <td>
+            <select class="form-select" data-field="unidad">
+              <option>KILOS</option><option>PZA</option><option>ROLLOS</option><option>TINAS</option><option>TARIMAS</option><option>CUBETAS</option><option>CAJAS</option><option>OTRO</option>
+            </select>
+          </td>
+          <td><input type="number" step="0.001" class="form-control" data-field="kilos"></td>
+          <td><input type="number" step="0.001" class="form-control" data-field="kilos_rec"></td>
+          <td><input type="text" class="form-control" data-field="comentarios"></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="text-end">
+      <button class="btn btn-success" id="btn-save" onclick="guardarTodo()">Guardar 1 registro</button>
+    </div>
+  </div>
+
+  <!-- PESTAÑA CONSULTA -->
+  <div id="tab-consulta" class="table-container hidden">
+    <div class="row mb-3 bg-light p-3 border rounded">
+      <div class="col-md-5">
+        <h6>Meses</h6>
+        <div id="filter-months" class="d-flex flex-wrap gap-1"></div>
+      </div>
+      <div class="col-md-5 text-end">
+        <h6>Años</h6>
+        <div id="filter-years" class="d-flex flex-wrap gap-1 justify-content-end"></div>
+      </div>
+      <div class="col-md-2 text-end align-self-center">
+        <button class="btn btn-primary w-100 mb-2" onclick="cargarDatosConsulta()">Ver datos</button>
+        <button class="btn btn-outline-success w-100" onclick="exportarExcel()">Exportar Excel</button>
+      </div>
+    </div>
+    
+    <div class="table-responsive" style="max-height: 500px;">
+      <table class="table table-sm table-striped table-hover" id="table-consulta">
+        <thead class="sticky-top bg-white border-bottom">
+          <tr id="headers-query"></tr>
+          <tr id="filters-query"></tr>
+        </thead>
+        <tbody id="tbody-query"></tbody>
+      </table>
+    </div>
+    <div class="total-bar d-flex justify-content-around" id="totals-query"></div>
+  </div>
+</div>
+
+<!-- MODAL CATALOGO -->
+<div class="modal fade" id="modalCatalogo" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Gestión de Catálogo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="input-group mb-3">
+          <input type="text" id="search-cat" class="form-control" placeholder="Buscar en catálogo...">
+          <button class="btn btn-primary" onclick="buscarEnCatalogo()">Buscar</button>
+          <button class="btn btn-success" onclick="nuevoItemCatalogo()">Crear Nuevo</button>
+        </div>
+        <div id="cat-results" style="max-height: 300px; overflow-y: auto;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let catalogoData = [];
+  let currentMov = "";
+  let queryData = [];
+
+  // Inicialización
+  window.onload = () => {
+    google.script.run.withSuccessHandler(res => catalogoData = res).getCatalogo();
+    initFilters();
+  };
+
+  function showTab(tab) {
+    document.getElementById('tab-captura').classList.toggle('hidden', tab !== 'captura');
+    document.getElementById('tab-consulta').classList.toggle('hidden', tab !== 'consulta');
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  function setMov(btn) {
+    document.querySelectorAll('.btn-mov').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMov = btn.innerText;
+  }
+
+  // --- BUSCADOR CODIGO ---
+  function searchCodigo(input) {
+    const val = input.value.toLowerCase();
+    const list = input.nextElementSibling;
+    list.innerHTML = "";
+    if (!val) { list.classList.add('hidden'); return; }
+
+    const matches = catalogoData.filter(item => item.label.toLowerCase().includes(val)).slice(0, 10);
+    matches.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "autocomplete-item";
+      div.innerHTML = item.label;
+      div.onclick = () => selectCodigo(input, item);
+      list.appendChild(div);
+    });
+    list.classList.remove('hidden');
+    
+    // Auto-llenado inteligente con Enter
+    input.onkeydown = (e) => {
+      if ((e.key === "Enter" || e.key === "Tab") && matches.length > 0) {
+        selectCodigo(input, matches[0]);
+        e.preventDefault();
+      }
+    };
+  }
+
+  function selectCodigo(input, item) {
+    input.value = item.codigo;
+    input.nextElementSibling.classList.add('hidden');
+    const row = input.closest('tr');
+    row.querySelector('#row-1-desc').innerHTML = `${item.descripcion}<br>${item.diametro} | ${item.largo} | ${item.acero}`;
+    row.querySelector('[data-field="unidad"]').value = item.unidad;
+    
+    // Almacenar datos ocultos en el elemento para guardar
+    row.dataset.itemData = JSON.stringify(item);
+  }
+
+  // --- GUARDADO ---
+  function guardarTodo() {
+    const fecha = document.getElementById('head-fecha').value;
+    const envio = document.getElementById('head-envio').value;
+    if (!fecha || !currentMov) return Swal.fire("Error", "Fecha y Movimiento son obligatorios", "error");
+
+    const row = document.getElementById('row-1');
+    if (!row.dataset.itemData) return Swal.fire("Error", "Seleccione un código válido", "error");
+    
+    const dataItem = JSON.parse(row.dataset.itemData);
+    const registro = {
+      fecha, envio, movimiento: currentMov,
+      codigo: dataItem.codigo, descripcion: dataItem.descripcion, diametro: dataItem.diametro,
+      largo: dataItem.largo, acero: dataItem.acero,
+      pedido: row.querySelector('[data-field="pedido"]').value,
+      origen: row.querySelector('[data-field="origen"]').value,
+      cantidad: Number(row.querySelector('[data-field="cantidad"]').value),
+      unidad: row.querySelector('[data-field="unidad"]').value,
+      kilos: Number(row.querySelector('[data-field="kilos"]').value),
+      kilos_rec: Number(row.querySelector('[data-field="kilos_rec"]').value),
+      comentarios: row.querySelector('[data-field="comentarios"]').value
+    };
+
+    Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
+    google.script.run.withSuccessHandler(res => {
+      Swal.fire("Éxito", res, "success");
+      location.reload(); // Limpiar formulario
+    }).guardarRegistros([registro]);
+  }
+
+  // --- CONSULTA Y FILTROS ---
+  function initFilters() {
+    const meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+    const containerMes = document.getElementById('filter-months');
+    meses.forEach((m, i) => {
+      const btn = document.createElement("button");
+      btn.className = "btn btn-sm btn-outline-secondary";
+      btn.innerText = m;
+      btn.onclick = () => btn.classList.toggle('btn-primary');
+      btn.dataset.val = i + 1;
+      containerMes.appendChild(btn);
+    });
+
+    const years = [2024, 2025, 2026, 2027]; // Dinámico en producción
+    const containerAnio = document.getElementById('filter-years');
+    years.forEach(y => {
+      const btn = document.createElement("button");
+      btn.className = "btn btn-sm btn-outline-secondary";
+      btn.innerText = y;
+      btn.onclick = () => btn.classList.toggle('btn-primary');
+      btn.dataset.val = y;
+      containerAnio.appendChild(btn);
+    });
+  }
+
+  function cargarDatosConsulta() {
+    const selMonths = Array.from(document.querySelectorAll('#filter-months .btn-primary')).map(b => b.dataset.val);
+    const selYears = Array.from(document.querySelectorAll('#filter-years .btn-primary')).map(b => b.dataset.val);
+    
+    google.script.run.withSuccessHandler(res => {
+      queryData = res.values;
+      // Filtrar por Mes/Año
+      let filtered = queryData.filter(r => {
+        const matchMes = selMonths.length === 0 || selMonths.includes(r[14].toString());
+        const matchAnio = selYears.length === 0 || selYears.includes(r[15].toString());
+        return matchMes && matchAnio;
+      });
+      renderQueryTable(res.headers, filtered);
+    }).getCirculanteData();
+  }
+
+  function renderQueryTable(headers, rows) {
+    const hTr = document.getElementById('headers-query');
+    const fTr = document.getElementById('filters-query');
+    const body = document.getElementById('tbody-query');
+    hTr.innerHTML = ""; fTr.innerHTML = ""; body.innerHTML = "";
+
+    headers.forEach((h, i) => {
+      if(i === 0 || i > 18) return; // Ocultar ID y campos internos
+      const th = document.createElement("th"); th.innerText = h; hTr.appendChild(th);
+      const tdF = document.createElement("td");
+      tdF.innerHTML = `<input type="text" class="form-control form-control-sm" onkeyup="filterTable(this, ${i})">`;
+      fTr.appendChild(tdF);
+    });
+
+    let sumCant = 0, sumKilos = 0, sumKilosRec = 0;
+
+    rows.forEach(r => {
+      const tr = document.createElement("tr");
+      headers.forEach((h, i) => {
+        if(i === 0 || i > 18) return;
+        const td = document.createElement("td"); 
+        td.innerText = r[i]; 
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+      sumCant += Number(r[10]) || 0;
+      sumKilos += Number(r[12]) || 0;
+      sumKilosRec += Number(r[13]) || 0;
+    });
+
+    document.getElementById('totals-query').innerHTML = `
+      <span>Registros: ${rows.length}</span>
+      <span>Suma CANT: ${sumCant.toFixed(2)}</span>
+      <span>Suma KILOS: ${sumKilos.toFixed(3)}</span>
+      <span>Suma K.REC: ${sumKilosRec.toFixed(3)}</span>
+    `;
+    queryData = rows; // Guardar para exportación
+  }
+
+  function filterTable(input, colIdx) {
+    const filter = input.value.toLowerCase();
+    const rows = document.querySelectorAll("#tbody-query tr");
+    rows.forEach(row => {
+      const text = row.cells[colIdx - 1].innerText.toLowerCase();
+      row.style.display = text.includes(filter) ? "" : "none";
+    });
+  }
+
+  function exportarExcel() {
+    const wb = XLSX.utils.book_new();
+    const movimientos = [...new Set(queryData.map(r => r[18]))];
+    
+    movimientos.forEach(mov => {
+      const filtered = queryData.filter(r => r[18] === mov);
+      const ws = XLSX.utils.json_to_sheet(filtered);
+      XLSX.utils.book_append_sheet(wb, ws, mov || "OTROS");
+    });
+    
+    XLSX.writeFile(wb, "Reporte_Circulante.xlsx");
+  }
+
+  // --- MODAL CATALOGO ---
+  const catModal = new bootstrap.Modal(document.getElementById('modalCatalogo'));
+  function openCatalogoModal() { catModal.show(); }
+
+  function buscarEnCatalogo() {
+    const term = document.getElementById('search-cat').value.toLowerCase();
+    const results = catalogoData.filter(i => i.label.toLowerCase().includes(term));
+    const container = document.getElementById('cat-results');
+    container.innerHTML = '<table class="table table-sm"><thead><tr><th>Cód</th><th>Desc</th><th>Acción</th></tr></thead><tbody id="cat-body"></tbody></table>';
+    const body = container.querySelector('tbody');
+    results.forEach(res => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${res.codigo}</td><td>${res.descripcion}</td>
+      <td><button class="btn btn-sm btn-warning" onclick='editCatItem(${JSON.stringify(res)})'>Editar</button></td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  function nuevoItemCatalogo() {
+    Swal.fire({
+      title: 'Nuevo Código',
+      html: `<input id="sw-cod" class="swal2-input" placeholder="Código">
+             <input id="sw-desc" class="swal2-input" placeholder="Descripción">`,
+      preConfirm: () => ({ 
+        codigo: document.getElementById('sw-cod').value, 
+        descripcion: document.getElementById('sw-desc').value,
+        unidad: "PZA" // Default
+      })
+    }).then(result => {
+      if(result.isConfirmed) google.script.run.crearNuevoCatalogo(result.value);
+    });
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

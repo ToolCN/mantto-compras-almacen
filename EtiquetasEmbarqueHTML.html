@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+      /* --- ESTILOS DE IMPRESIÓN CRÍTICOS --- */
+      @media print {
+        @page { 
+          size: 4in 6in; 
+          margin: 0; 
+        }
+        body { 
+          margin: 0 !important; 
+          padding: 0 !important; 
+        }
+        .no-print { display: none !important; }
+        
+        .label-card {
+           margin: 0 !important; 
+           border: none !important; /* Quita borde visual al imprimir */
+           page-break-after: always; 
+        }
+      }
+
+      /* Estilo Pantalla */
+      body { 
+        font-family: 'Arial', sans-serif; 
+        background-color: #eee; 
+        margin: 0; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        padding: 10px;
+      }
+
+      .label-card {
+        background: white;
+        width: 98mm; 
+        height: 145mm; 
+        border: 2px solid black; 
+        box-sizing: border-box;
+        padding: 4mm; 
+        margin-bottom: 20px; 
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* HEADER */
+      .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; }
+      .logo { width: 95px; object-fit: contain; }
+      .header-right { text-align: right; width: 70%; }
+      .date-print { font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px; display:block; }
+      .header-text { font-weight: 900; font-size: 19px; line-height: 0.9; text-transform: uppercase; color: black; }
+      .header-pedido { color: #1565c0; font-size: 22px; margin-top: 4px; display: block; }
+
+      /* LOTE */
+      .lote-main { font-size: 44px; font-weight: 900; text-align: center; margin: 1px 0; line-height: 1; color: #c62828; }
+
+      /* DETALLES */
+      .center-block { text-align: center; margin-top: 0px; }
+      .row-tipo { font-size: 20px; font-weight: 900; margin-bottom: 1px; line-height: 1; }
+      .row-dims { font-size: 26px; font-weight: 900; margin: 2px 0; color: blue; line-height: 1; }
+      .row-det { font-size: 18px; font-weight: bold; color: #333; line-height: 1; margin-top: 2px;}
+
+      /* ACERO */
+      .acero-row { text-align: right; font-size: 20px; font-weight: 900; margin: 5px 0; border-bottom: 2px solid black; display: inline-block; width: 100%; line-height: 1; }
+      .acero-val { font-size: 36px; color: #1565c0; }
+
+      /* PESO UNITARIO */
+      .peso-u { font-size: 15px; font-weight: 900; text-align: right; margin-bottom: 2px; color: #333; }
+      
+      /* SECCION CENTRAL */
+      .middle-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 0px; flex: 0 0 auto; }
+      .weight-col { flex: 1; padding-top: 5px; }
+      .peso-neto-lbl { font-size: 18px; font-weight: 900; margin-top: 0px; line-height: 1; }
+      .peso-neto-val { font-size: 40px; font-weight: 900; text-decoration: underline; line-height: 1; }
+      .peso-conv { font-size: 24px; font-weight: 900; margin-top: 5px; color: #333; line-height: 1; }
+      .qr-col { width: 105px; text-align: right; }
+      .qr-box { width: 100px; height: 100px; border: 1px solid #eee; }
+
+      /* INFO FOOTER */
+      .info-row { margin-top: 5px; display: flex; justify-content: space-between; align-items: flex-end; }
+      .info-left { display: flex; flex-direction: column; justify-content: flex-end; font-size: 16px; font-weight: 900; gap: 2px; }
+      .info-right { text-align: right; display: flex; align-items: flex-end; }
+      
+      /* SVG AJUSTADO */
+      .icon-svg { width: 120px; height: 120px; display: block; } 
+      .icon-svg svg { width: 100%; height: 100%; object-fit: contain; }
+
+      /* DESCRIPCION */
+      .foot-desc { font-size: 14px; font-weight: 900; position: absolute; bottom: 3mm; left: 50%; transform: translateX(-50%); width: 98%; text-align: center; color: #1565c0; line-height: 1.0; white-space: normal; overflow: visible; background-color: white; }
+
+      /* BOTONES FLOTANTES */
+      .fab { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 999; }
+      .btn { padding: 15px 25px; border: none; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3); color: white; }
+      .btn-print { background: #1976d2; }
+      .btn-close { background: #455a64; }
+
+    </style>
+  </head>
+  <body>
+
+    <div class="fab no-print">
+      <button class="btn btn-print" onclick="window.print()">🖨️ IMPRIMIR</button>
+      <button class="btn btn-close" onclick="window.close()">CERRAR VENTANA</button>
+    </div>
+
+    <? for (var i = 0; i < etiquetas.length; i++) { ?>
+      <? var e = etiquetas[i]; ?>
+      
+      <? 
+         // --- CONFIGURACIÓN QR ---
+         var appId = "e2bbf8fb-e195-41f5-b9df-d44f9ac44980";
+         var deepLink = "https://www.appsheet.com/start/" + appId + "#control=FORM_PUENTE_QR&defaults=" + encodeURIComponent('{"LOTE_ESCANEADO":"' + e.lote + '"}');
+         var qrUrl = "https://quickchart.io/qr?text=" + encodeURIComponent(deepLink) + "&size=400&margin=1";
+
+         // Usamos la conversión que ya calculó el servidor (GS)
+         var textoConversion = e.conversion; 
+      ?>
+
+      <div class="label-card">
+        <div class="header">
+          <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" class="logo">
+          <div class="header-right">
+             <span class="date-print"><?= e.fechaImp ?></span>
+             <div class="header-text">ETIQUETA DE<br>IDENTIFICACION<span class="header-pedido"><?= e.pedido ?></span></div>
+          </div>
+        </div>
+
+        <div class="lote-main"><?= e.lote ?></div>
+
+        <div class="center-block">
+          <div class="row-tipo"><?= e.tipo ?></div>
+          <!-- Esto imprime: DIAMETRO X LONGITUD -->
+          <div class="row-dims"><?= e.dia ?> X <?= e.long ?></div>
+          <!-- Esto imprime: CUERDA CUERPO -->
+          <div class="row-det"><?= e.det ?></div>
+        </div>
+
+        <div class="acero-row">ACERO: <span class="acero-val"><?= e.acero ?></span></div>
+        <div class="peso-u">PESO UNITARIO: <?= Number(e.pesoU).toFixed(5) ?></div>
+
+        <div class="middle-section">
+          <div class="weight-col">
+             <div class="peso-neto-lbl">PESO NETO:</div>
+             <div class="peso-neto-val"><?= Number(e.pesoNeto).toLocaleString('en-US') ?> KG</div>
+             <!-- Esta variable ya viene calculada del servidor -->
+             <div class="peso-conv"><?= e.conversion ?></div>
+          </div>
+          <div class="qr-col"><img src="<?= qrUrl ?>" class="qr-box"></div>
+        </div>
+
+        <div class="info-row">
+           <div class="info-left">
+             <? if(Number(e.pesoTina) > 0) { ?>
+             <div>BRUTO: <?= Math.round(Number(e.pesoBruto)) ?> KG</div>
+             <div>P.TINA: <?= Math.round(Number(e.pesoTina)) ?> KG</div>
+             <? } ?>
+             <div>SELLO MP: <?= e.sello ?></div>
+             <div>TINA: <?= e.tina ?></div>
+           </div>
+           <div class="info-right"><div class="icon-svg" style="margin-top:-12px"><?!= e.iconoTipo ?></div></div>
+        </div>
+
+        <div class="foot-desc"><?= e.codigo ?> - <?= e.desc ?></div>
+      </div>
+    <? } ?>
+
+    <script>
+       // Opcional: imprimir automático al cargar
+       // window.onload = function() { setTimeout(function(){ window.print(); }, 1000); }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root { --primary: #2c3e50; --accent: #3498db; }
+    body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .card { border: none; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    .header-order { background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border-radius: 15px 15px 0 0; padding: 20px; }
+    #signature-pad { border: 2px dashed #ccc; border-radius: 10px; background: white; cursor: crosshair; touch-action: none; }
+    .btn-finish { background: #27ae60; border: none; padding: 15px; font-weight: bold; font-size: 1.1rem; transition: 0.3s; }
+    .btn-finish:hover { background: #219150; transform: translateY(-2px); }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <div class="card">
+      <div class="header-order">
+        <div class="d-flex justify-content-between align-items-center">
+          <h4 class="m-0"><i class="fas fa-tools me-2"></i> CIERRE DE ORDEN</h4>
+          <span class="badge bg-light text-dark shadow-sm" id="folio-display"><?= folio_inyectado ?></span>
+        </div>
+      </div>
+      
+      <div class="card-body p-4">
+        <form id="formCierre">
+          <div class="mb-4">
+            <label class="form-label fw-bold"><i class="fas fa-clipboard-check me-2 text-primary"></i>TRABAJO REALIZADO</label>
+            <textarea id="trabajo" class="form-control" rows="4" placeholder="Describe detalladamente la solución..." required></textarea>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-6">
+              <label class="form-label fw-bold"><i class="fas fa-clock me-2 text-primary"></i>HORAS HOMBRE</label>
+              <input type="number" id="horas" class="form-control form-control-lg" step="0.5" placeholder="0.0" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-bold"><i class="fas fa-user-check me-2 text-primary"></i>TÉCNICO</label>
+              <input type="text" id="firma_nombre" class="form-control form-control-lg" value="<?= usuario_inyectado ?>" readonly>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-bold"><i class="fas fa-pen-nib me-2 text-primary"></i>FIRMA DIGITAL</label>
+            <canvas id="signature-pad" class="w-100" height="200"></canvas>
+            <div class="text-end mt-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSignature()">Limpiar Firma</button>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-primary btn-finish w-100 shadow" onclick="procesarCierre()">
+            <i class="fas fa-check-circle me-2"></i>FINALIZAR Y CERRAR ORDEN
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+  <script>
+    let signaturePad;
+    window.onload = () => {
+      const canvas = document.getElementById('signature-pad');
+      signaturePad = new SignaturePad(canvas);
+      resizeCanvas();
+    };
+
+    function resizeCanvas() {
+      const canvas = document.getElementById('signature-pad');
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      canvas.width = canvas.offsetWidth * ratio;
+      canvas.height = canvas.offsetHeight * ratio;
+      canvas.getContext("2d").scale(ratio, ratio);
+    }
+
+    function clearSignature() { signaturePad.clear(); }
+
+    function procesarCierre() {
+      const trabajo = document.getElementById('trabajo').value;
+      const horas = document.getElementById('horas').value;
+
+      if (!trabajo || !horas || signaturePad.isEmpty()) {
+        return Swal.fire('Error', 'Por favor completa todos los campos y firma la orden.', 'warning');
+      }
+
+      Swal.fire({
+        title: '¿Confirmar Cierre?',
+        text: "Esta acción marcará la orden como terminada.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#27ae60',
+        confirmButtonText: 'Sí, Cerrar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          
+          const data = {
+            folio: "<?= folio_inyectado ?>",
+            trabajo: trabajo.toUpperCase(),
+            horas: horas,
+            firma: signaturePad.toDataURL(), // Guardamos la firma como imagen
+            tecnico: document.getElementById('firma_nombre').value
+          };
+
+          google.script.run.withSuccessHandler(res => {
+            Swal.fire('¡Éxito!', 'Orden cerrada correctamente.', 'success').then(() => {
+              google.script.host.close();
+            });
+          }).cerrarOrden(data);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root { 
+      --primary: #1a237e; 
+      --bg: #f4f7f6; 
+      --danger: #d32f2f; 
+      --success: #2e7d32; 
+      --purple: #7b1fa2;
+      --vibrant-yellow: #FFFF00;
+    }
+    body { font-family: 'Roboto', sans-serif; background: var(--bg); margin: 0; padding: 10px; }
+
+    /* --- LOGO TOOL CN: SOLUCIÓN NUCLEAR --- */
+    #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; z-index: 99999; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .tool-container { width: 500px; height: 160px; }
+    .text-svg { font-size: 100px; font-weight: 900; text-anchor: middle; font-family: 'Roboto', sans-serif; }
+    .liquid { animation: fill-anim 3s infinite ease-in-out; }
+    @keyframes fill-anim { 0%, 100% { transform: translateY(120px); } 50% { transform: translateY(0px); } }
+    .clean-outline { filter: drop-shadow(2.5px 0px 0px black) drop-shadow(-2.5px 0px 0px black) drop-shadow(0px 2.5px 0px black) drop-shadow(0px -2.5px 0px black); }
+
+    /* --- INTERFAZ --- */
+    .progress-box { width: 300px; background: #eee; height: 12px; border-radius: 6px; margin-top: 20px; overflow: hidden; border: 1px solid #ddd; display: none; }
+    .progress-fill { width: 0%; height: 100%; background: var(--primary); transition: width 0.1s; }
+
+    .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); box-sizing: border-box; }
+    .form-control { width: 100%; padding: 12px; border: 1.5px solid #eee; border-radius: 10px; box-sizing: border-box; font-size: 16px; background: #fff; text-transform: uppercase; }
+
+    .btn-masivo { background: var(--purple); color: white; border: none; padding: 8px 15px; border-radius: 20px; font-weight: 900; cursor: pointer; font-size: 12px; }
+    #boxMasivo { display: none; background: #f3e5f5; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 2px dashed var(--purple); }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th { background: #eee; color: #000 !important; padding: 10px; font-size: 11px; font-weight: 900; border: 1px solid #ddd; text-align: center; }
+    td { border: 1px solid #eee; padding: 5px; }
+    .input-cell { width: 100%; border: none; padding: 8px; box-sizing: border-box; font-size: 14px; text-transform: uppercase; outline: none; }
+
+    #success-content { display: none; flex-direction: column; align-items: center; }
+    .btn-final { width: 250px; padding: 18px; border: none; border-radius: 12px; font-weight: 900; cursor: pointer; margin-top: 15px; font-size: 16px; text-transform: uppercase; }
+
+    /* --- ESTILOS DEL TICKET --- */
+    #ticket-container { position: absolute; left: -9999px; }
+    #ticket-preview { width: 750px; position: relative; box-sizing: border-box; background: white; padding-bottom: 20px; }
+    
+    .prog-container { display: flex; justify-content: space-between; position: relative; margin: 30px 40px; font-weight: 900; font-size: 10px; text-transform: uppercase; color: #333; }
+    .prog-line { position: absolute; top: 18px; left: 0; width: 100%; height: 6px; background: #eee; z-index: 1; border-radius: 3px; }
+    .prog-line-fill { position: absolute; top: 18px; left: 0; height: 6px; background: #1a237e; z-index: 2; border-radius: 3px; width: 0%; transition: 0.5s; }
+    .step { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; width: 80px; }
+    .circle { width: 40px; height: 40px; background: white; border: 4px solid #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; font-size: 18px; font-weight: 900; color: #ddd; }
+    
+    .estado-solicitado .circle-1 { background: #c8e6c9 !important; border-color: #2e7d32 !important; color: #2e7d32 !important; }
+    .estado-solicitado #p-fill { width: 12% !important; }
+
+    .prio-Critica { background-color: #d32f2f !important; }
+    .prio-Alta { background-color: #ff9800 !important; }
+    .prio-Media { background-color: #fbc02d !important; }
+    .prio-Baja { background-color: #03a9f4 !important; }
+
+    .prio-banner { text-align: center; font-weight: 900; padding: 12px; font-size: 20px; text-transform: uppercase; color: #000; }
+    .ticket-body { background: white; margin: 0 15px; padding: 25px; border-radius: 5px; }
+    .t-table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: fixed; }
+    .t-table th, .t-table td { border: 1.5px solid #000; padding: 8px; font-size: 13px; text-transform: uppercase; color: #000; }
+    .t-table th { background: #f0f0f0; font-weight: 900; }
+  </style>
+</head>
+<body>
+
+<div id="overlay">
+  <div id="loading-ui">
+    <div class="tool-container">
+      <svg viewBox="0 0 500 150">
+        <defs><mask id="mask-text"><text x="250" y="110" fill="white" class="text-svg">TOOL CN</text></mask></defs>
+        <g class="clean-outline">
+          <text x="250" y="110" fill="white" class="text-svg">TOOL CN</text>
+          <g mask="url(#mask-text)"><rect class="liquid" x="0" y="0" width="500" height="150" fill="var(--vibrant-yellow)" /></g>
+        </g>
+      </svg>
+    </div>
+    <h2 id="overlay-text" style="color:var(--primary); font-weight: 900;">PROCESANDO ENVÍO...</h2>
+    <div id="p-box" class="progress-box"><div id="bar" class="progress-fill"></div></div>
+  </div>
+  <div id="success-content">
+    <div style="background: #e8f5e9; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+       <h1 style="color:var(--success); font-size:40px; margin:0;">✔</h1>
+    </div>
+    <h2 style="color:var(--primary); font-weight: 900; margin:0;">¡REQUISICIÓN ENVIADA!</h2>
+    <button class="btn-final" style="background:var(--success); color:white" onclick="reiniciarFormulario()">Generar Nueva</button>
+    <button class="btn-final" style="background:#333; color:white" onclick="window.top.close()">Cerrar</button>
+  </div>
+</div>
+
+<div class="container">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" width="130">
+    <div style="text-align:right">
+      <button class="btn-masivo" onclick="document.getElementById('boxMasivo').style.display='block'">( + ) AGREGAR MASIVO</button><br>
+      <small style="font-weight:900">FOLIO</small><br><b id="folioDisp" style="color:red; font-size:26px;">...</b>
+    </div>
+  </div>
+
+  <div id="boxMasivo">
+    <label>Excel (CANTIDAD, UNIDAD, DESCRIPCION)</label>
+    <input type="file" id="excelFile" accept=".xlsx, .xls" class="form-control">
+    <button onclick="procesarExcel()" style="margin-top:10px; background:var(--purple); color:white; padding:10px; border:none; border-radius:8px; cursor:pointer;">PROCESAR</button>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:10px;">
+    <div class="form-group">
+      <label>Solicitante</label>
+      <select id="solicitante" class="form-control" style="border: 2px solid var(--primary);">
+        <option value="">-- Seleccione --</option>
+        <option value="Almacen">Almacen</option><option value="Edi Zuñiga">Edi Zuñiga</option><option value="Abraham Pensa">Abraham Pensa</option><option value="Aldair Gómez">Aldair Gómez</option><option value="Rebeca Angel">Rebeca Angel</option><option value="Jorge Sánchez">Jorge Sánchez</option><option value="Ezequiel Velazquez">Ezequiel Velazquez</option><option value="Patricia Torres">Patricia Torres</option><option value="David Mondragon">David Mondragon</option><option value="Roberto Díaz">Roberto Díaz</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Prioridad</label>
+      <select id="prioridad" class="form-control">
+        <option value="Baja">Baja (Stock)</option><option value="Media" selected>Media (1 Semana)</option><option value="Alta">Alta (1-2 Días)</option><option value="Critica">Crítica (Inmediata)</option>
+      </select>
+    </div>
+  </div>
+
+  <table id="tablaPartidas">
+    <thead><tr><th width="40">PA</th><th width="80">CANT</th><th width="120">UNIDAD</th><th>DESCRIPCIÓN</th><th width="40"></th></tr></thead>
+    <tbody>
+      <tr>
+        <td align="center" class="pa-num" style="font-weight:900">1</td>
+        <td><input type="number" class="input-cell cant"></td>
+        <td>
+          <select class="input-cell uni">
+            <option value="PIEZAS">PIEZAS</option><option value="KILOS">KILOS</option><option value="LITROS">LITROS</option><option value="METROS">METROS</option><option value="UNIDADES">UNIDADES</option><option value="OTRO">OTRO</option>
+          </select>
+        </td>
+        <td><input type="text" class="input-cell desc"></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <button onclick="agregarFila()" style="margin-top:10px; color:var(--primary); font-weight:900; border:none; background:none; cursor:pointer;">+ AGREGAR FILA</button>
+
+  <div class="form-group" style="margin-top:20px;"><label>Observaciones</label><textarea id="obs" class="form-control" rows="2"></textarea></div>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; background:#eee; padding:15px; border-radius:12px;">
+    <div><label>¿Importación?</label><button id="btnImp" onclick="toggleImp()" class="btn-toggle off" style="background:#777; color:white; padding:10px 20px; border-radius:8px; border:none; font-weight:900;">NO</button></div>
+    <div style="flex:1; margin-left:20px;"><label>Adjunto (Opcional)</label><input type="file" id="archivo"></div>
+  </div>
+
+  <button class="btn-final" style="background:var(--primary); color:white; width:100%; margin-top:20px;" onclick="guardarTodo()">🚀 GUARDAR Y ENVIAR</button>
+</div>
+
+<!-- TICKET TELEGRAM -->
+<div id="ticket-container">
+  <div id="ticket-preview">
+    <div class="prio-banner" id="t-banner-top"></div>
+    <div class="prog-container">
+      <div class="prog-line"></div><div class="prog-line-fill" id="p-fill"></div>
+      <div class="step"><div class="circle circle-1">1</div>Solicitado</div>
+      <div class="step"><div class="circle circle-2">2</div>Cotizado</div>
+      <div class="step"><div class="circle circle-3">3</div>Autorizado</div>
+      <div class="step"><div class="circle circle-4">4</div>Parcial</div>
+      <div class="step"><div class="circle circle-5">5</div>Terminado</div>
+    </div>
+    <div class="ticket-body">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2.5px solid #000; padding-bottom:12px;">
+        <div><h2 style="margin:0; text-transform:uppercase;">Requisición de Compra</h2><b id="t-folio" style="font-size:24px; color:red;"></b></div>
+        <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" width="150">
+      </div>
+      <div style="margin-top:15px; font-size:16px;">SOLICITA: <b id="t-sol"></b> | IMPORTACIÓN: <b id="t-imp"></b></div>
+      <table class="t-table"><thead><tr><th width="60">CANT</th><th width="90">UNI</th><th>DESCRIPCIÓN</th></tr></thead><tbody id="t-body"></tbody></table>
+      <div style="margin-top:15px; border-top:2px solid #000; padding-top:10px; font-size:14px;"><b>OBS:</b> <span id="t-obs"></span></div>
+    </div>
+    <div class="prio-banner" id="t-banner-bottom"></div>
+  </div>
+</div>
+
+<script>
+// IDs reales de Telegram para la prueba
+const CHAT_IDS_USUARIOS = {
+  "ALMACEN": "TU_ID_AQUI",
+  "EDI ZUÑIGA": "TU_ID_AQUI",
+  "ABRAHAM PENSADO": "1935511253",
+  "ALDAIR GÓMEZ": "859841328",
+  "REBECA ANGEL": "1293433169",
+  "JORGE SÁNCHEZ": "TU_ID_AQUI",
+  "EZEQUIEL VELAZQUEZ": "TU_ID_AQUI",
+  "PATRICIA TORRES": "1288025824",
+  "DAVID MONDRAGON": "35649383",
+  "ROBERTO DÍAZ": "625827165"
+};
+let folioActual = "";
+
+window.onload = () => { obtenerFolio(); };
+
+function obtenerFolio() {
+  document.getElementById('overlay').style.display = 'flex';
+  google.script.run.withSuccessHandler(f => { 
+    folioActual = f; 
+    document.getElementById('folioDisp').innerText = f; 
+    document.getElementById('overlay').style.display = 'none'; 
+  }).getSiguienteFolioReq();
+}
+
+function reiniciarFormulario() {
+  document.getElementById('success-content').style.display = 'none';
+  document.getElementById('loading-ui').style.display = 'flex';
+  document.getElementById('p-box').style.display = 'none';
+  document.getElementById('solicitante').value = "";
+  document.getElementById('obs').value = "";
+  document.getElementById('archivo').value = "";
+  document.getElementById('tablaPartidas').querySelector('tbody').innerHTML = '<tr><td align="center" class="pa-num" style="font-weight:900">1</td><td><input type="number" class="input-cell cant"></td><td><select class="input-cell uni"><option value="PIEZAS">PIEZAS</option><option value="KILOS">KILOS</option><option value="LITROS">LITROS</option><option value="METROS">METROS</option><option value="UNIDADES">UNIDADES</option><option value="OTRO">OTRO</option></select></td><td><input type="text" class="input-cell desc"></td><td></td></tr>';
+  obtenerFolio();
+}
+
+function agregarFila() {
+  const table = document.getElementById('tablaPartidas').querySelector('tbody');
+  const count = table.rows.length + 1;
+  const row = table.insertRow(-1);
+  row.innerHTML = `<td align="center" class="pa-num" style="font-weight:900">${count}</td><td><input type="number" class="input-cell cant"></td><td><select class="input-cell uni"><option value="PIEZAS">PIEZAS</option><option value="KILOS">KILOS</option><option value="LITROS">LITROS</option><option value="METROS">METROS</option><option value="UNIDADES">UNIDADES</option><option value="OTRO">OTRO</option></select></td><td><input type="text" class="input-cell desc"></td><td align="center"><button onclick="this.parentElement.parentElement.remove(); renumerar();" style="color:red; border:none; background:none; font-weight:bold; cursor:pointer;">X</button></td>`;
+}
+
+function renumerar() { document.querySelectorAll('.pa-num').forEach((td, i) => td.innerText = i + 1); }
+function toggleImp() { const b = document.getElementById('btnImp'); b.innerText = b.innerText === "NO" ? "SI" : "NO"; b.style.background = b.innerText === "SI" ? "#7b1fa2" : "#777"; }
+
+function procesarExcel() {
+  const file = document.getElementById('excelFile').files[0];
+  if(!file) return alert("Seleccione archivo");
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, {type: 'array'});
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+    const tbody = document.getElementById('tablaPartidas').querySelector('tbody');
+    tbody.innerHTML = "";
+    rows.forEach((r, i) => {
+      const row = tbody.insertRow(-1);
+      row.innerHTML = `<td align="center" class="pa-num" style="font-weight:900">${i+1}</td><td><input type="number" class="input-cell cant" value="${r.CANTIDAD || 0}"></td><td><select class="input-cell uni"><option value="${r.UNIDAD || 'PIEZAS'}" selected>${r.UNIDAD || 'PIEZAS'}</option><option value="PIEZAS">PIEZAS</option><option value="KILOS">KILOS</option><option value="LITROS">LITROS</option><option value="METROS">METROS</option><option value="UNIDADES">UNIDADES</option><option value="OTRO">OTRO</option></select></td><td><input type="text" class="input-cell desc" value="${String(r.DESCRIPCION || '').toUpperCase()}"></td><td align="center"><button onclick="this.parentElement.parentElement.remove(); renumerar();" style="color:red; border:none; background:none; font-weight:bold; cursor:pointer;">X</button></td>`;
+    });
+    document.getElementById('boxMasivo').style.display = 'none';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function guardarTodo() {
+  const sol = document.getElementById('solicitante').value;
+  const prio = document.getElementById('prioridad').value;
+  const imp = document.getElementById('btnImp').innerText;
+  const obs = document.getElementById('obs').value;
+  const fileInput = document.getElementById('archivo');
+
+  const partidas = [];
+  document.querySelectorAll('#tablaPartidas tbody tr').forEach(r => {
+    const c = r.querySelector('.cant').value;
+    const d = r.querySelector('.desc').value;
+    if(c && d) partidas.push({ cantidad: c, unidad: r.querySelector('.uni').value, descripcion: d.toUpperCase() });
+  });
+
+  if(!sol || !partidas.length) return alert("Faltan datos (Solicitante y al menos una partida)");
+
+  // 1. Mostrar UI de carga
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('loading-ui').style.display = 'flex';
+  document.getElementById('p-box').style.display = 'block';
+
+  // 2. Preparar Ticket Visual
+  const ticket = document.getElementById('ticket-preview');
+  ticket.className = "estado-solicitado prio-" + prio;
+  document.getElementById('t-banner-top').innerText = prio=="Critica"?"COMPRA INMEDIATA":prio=="Alta"?"COMPRA 1-2 DÍAS":prio=="Media"?"COMPRA 1 SEMANA":"COMPRA PROGRAMADA";
+  document.getElementById('t-banner-bottom').innerText = document.getElementById('t-banner-top').innerText;
+  document.getElementById('t-folio').innerText = folioActual;
+  document.getElementById('t-sol').innerText = sol.toUpperCase();
+  document.getElementById('t-imp').innerText = imp;
+  document.getElementById('t-obs').innerText = obs.toUpperCase();
+  let h = ""; partidas.forEach(p => h += `<tr><td align="center">${p.cantidad}</td><td align="center">${p.unidad}</td><td>${p.descripcion}</td></tr>`);
+  document.getElementById('t-body').innerHTML = h;
+
+  // 3. Generar imagen y disparar secuencia
+  html2canvas(ticket, {scale: 2, useCORS: true}).then(canvas => {
+    const base64 = canvas.toDataURL("image/png");
+    const chatId = CHAT_IDS_USUARIOS[sol.toUpperCase()];
+
+    const desencadenarGuardadoFinal = (idTelegram) => {
+      const payload = { folio: folioActual, solicitante: sol, prioridad: prio, importacion: imp, observaciones: obs, partidas: partidas, msg_id: idTelegram };
+      if(fileInput.files.length > 0) {
+         const f = fileInput.files[0], r = new FileReader();
+         r.onload = (e) => ejecutarGuardado(payload, { base64: e.target.result.split(',')[1], type: f.type, name: f.name });
+         r.readAsDataURL(f);
+      } else { ejecutarGuardado(payload, null); }
+    };
+
+    // Envío a grupo (independiente)
+    google.script.run.enviarTelegramReq(base64, folioActual);
+
+    // Envío a privado (y guardado posterior)
+    if(chatId) {
+      google.script.run
+        .withSuccessHandler(id => desencadenarGuardadoFinal(id))
+        .withFailureHandler(() => desencadenarGuardadoFinal("")) // Si falla Telegram, guardar igual
+        .enviarTelegramPrivadoReq(base64, folioActual, chatId);
+    } else { 
+      desencadenarGuardadoFinal(""); 
+    }
+  }).catch(err => {
+    console.error(err);
+    alert("Error en captura visual. Se intentará guardar sin imagen.");
+    desencadenarGuardadoFinal("");
+  });
+}
+
+function ejecutarGuardado(p, a) {
+  let pct = 0; const bar = document.getElementById('bar');
+  const itv = setInterval(() => {
+    pct += 10; bar.style.width = pct + "%";
+    if(pct >= 90) clearInterval(itv);
+  }, 50);
+
+  google.script.run.withSuccessHandler(res => {
+    clearInterval(itv);
+    bar.style.width = "100%";
+    if(res=="OK") { 
+      document.getElementById('loading-ui').style.display='none'; 
+      document.getElementById('success-content').style.display='flex'; 
+    } else { 
+      alert(res); 
+      document.getElementById('overlay').style.display='none'; 
+    }
+  }).withFailureHandler(err => {
+    clearInterval(itv);
+    alert("Error crítico en servidor: " + err);
+    document.getElementById('overlay').style.display='none';
+  }).guardarRequisicion(p, a);
+}
+</script>
+</body>
+</html>

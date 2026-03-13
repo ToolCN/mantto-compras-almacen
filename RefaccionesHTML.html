@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    :root { --primary: #1a1c1e; --accent: #0d6efd; --success: #198754; --danger: #dc3545; --warning: #ffc107; }
+    body { font-family: 'Inter', sans-serif; background: #e9ecef; font-size: 13px; margin:0; }
+    
+    /* LOADER */
+    #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; }
+    .tool-container { width: 450px; height: 140px; }
+    .text-svg { font-size: 100px; font-weight: 900; text-anchor: middle; font-family: 'Roboto', sans-serif; }
+    .liquid { animation: fill-anim 3s infinite ease-in-out; }
+    @keyframes fill-anim { 0%, 100% { transform: translateY(120px); } 50% { transform: translateY(0px); } }
+    .clean-outline { filter: drop-shadow(2px 0px 0px black) drop-shadow(-2px 0px 0px black) drop-shadow(0px 2px 0px black) drop-shadow(0px -2px 0px black); }
+
+    .app-header { background: var(--primary); color: white; padding: 10px 25px; display: flex; justify-content: space-between; align-items: center; }
+    .content-card { background: white; border-radius: 8px; padding: 20px; margin: 15px; min-height: 85vh; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    
+    .nav-pills .nav-link { font-weight: 700; color: #666; border-radius: 20px; padding: 8px 25px; margin-right: 10px; }
+    .nav-pills .nav-link.active { background-color: var(--accent); }
+
+    /* ESTADOS SEMAFORO */
+    .st-ok { background: #d1e7dd; color: #0f5132; font-weight: 900; }
+    .st-reorden { background: #fff3cd; color: #856404; font-weight: 900; }
+    .st-critico { background: #f8d7da; color: #842029; font-weight: 900; }
+
+    /* MOVIMIENTOS STYLES */
+    .box-info { border: 1px solid #dee2e6; border-radius: 10px; padding: 15px; background: #f8f9fa; height: 100%; }
+    .arrow-flow { font-size: 24px; color: var(--accent); font-weight: 900; margin: 0 15px; display: flex; align-items: center; }
+    .stock-big { font-size: 32px; font-weight: 900; color: #333; }
+    .stock-next { font-size: 32px; font-weight: 900; color: var(--accent); }
+    
+    .historial-list { max-height: 500px; overflow-y: auto; font-size: 11px; }
+    .historial-item { border-left: 4px solid var(--accent); margin-bottom: 8px; padding: 8px; background: white; border-radius: 0 5px 5px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+    /* AUTOCOMPLETE */
+    .autocomplete-box { position: absolute; z-index: 1000; background: white; width: 100%; border: 1px solid #ddd; border-radius: 0 0 5px 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .autocomplete-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+    .autocomplete-item:hover { background: #f0f7ff; }
+
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(13,110,253,0.1); }
+  </style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="tool-container">
+    <svg viewBox="0 0 1000 400">
+      <defs><clipPath id="text-clip"><text x="500" y="250" class="text-svg">TOOL CN</text></clipPath></defs>
+      <g class="clean-outline">
+        <text x="500" y="250" class="text-svg" fill="none" stroke="black" stroke-width="4">TOOL CN</text>
+        <g clip-path="url(#text-clip)">
+          <rect width="1000" height="400" fill="#f0f0f0" />
+          <path d="M0,100 C150,50 350,150 500,100 C650,50 850,150 1000,100 L1000,400 L0,400 Z" fill="#FFD700" class="liquid">
+            <animateTransform attributeName="transform" type="translate" from="-1000 0" to="0 0" dur="2.5s" repeatCount="indefinite" />
+          </path>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <p class="mt-2 fw-bold text-muted">Sincronizando Inventario...</p>
+</div>
+
+<div class="app-header">
+  <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" height="40">
+  <h5 class="m-0 fw-900">REFACCIONES Y HERRAMENTALES</h5>
+</div>
+
+<div class="content-card">
+  <ul class="nav nav-pills mb-4" id="pills-tab">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-existencias">📊 EXISTENCIAS</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-movimientos">🔄 MOVIMIENTOS</button></li>
+  </ul>
+
+  <div class="tab-content">
+    <!-- PESTAÑA 1: EXISTENCIAS -->
+    <div class="tab-pane fade show active" id="tab-existencias">
+      <div class="d-flex justify-content-between mb-3">
+        <input type="text" id="cat-search" class="form-control w-50" placeholder="🔍 Buscar por código, descripción o ubicación..." onkeyup="filtrarExistencias()">
+        <button class="btn btn-dark fw-bold rounded-pill px-4" onclick="abrirModalCat('NUEVO')">+ AGREGAR ITEM</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle border">
+          <thead class="table-light">
+            <tr>
+              <th>CÓDIGO</th><th>DESCRIPCIÓN</th><th>STOCK</th><th>MIN</th><th>MAX</th><th>UBICACIÓN</th><th>ESTADO</th><th>EDITAR</th>
+            </tr>
+          </thead>
+          <tbody id="exis-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PESTAÑA 2: MOVIMIENTOS -->
+    <div class="tab-pane fade" id="tab-movimientos">
+      <div class="row g-4">
+        <!-- Lado Izquierdo: Operación -->
+        <div class="col-md-8 border-end">
+          <div class="row g-2 mb-4">
+            <div class="col-md-4">
+              <label class="fw-bold small text-muted">TIPO DE OPERACIÓN</label>
+              <select id="m-tipo" class="form-select fw-bold">
+                <option value="ENTRADA">🟢 ENTRADA AL ALMACÉN</option>
+                <option value="SALIDA">🔴 SALIDA DE MATERIAL</option>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="fw-bold small text-muted">IDENTIFICAR PRODUCTO</label>
+              <div class="position-relative">
+                <input type="text" id="m-busc" class="form-control" placeholder="Escribe código o descripción..." onkeyup="buscarInsumo(this)">
+                <div id="m-res" class="autocomplete-box d-none"></div>
+              </div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-outline-dark w-100 fw-bold" onclick="iniciarScanner()">📷 ESCANEAR QR</button>
+            </div>
+          </div>
+
+          <div id="m-detalle-container" class="d-none">
+            <div class="box-info mb-3">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h4 id="det-desc" class="fw-900 m-0">RODAMIENTO 6204-ZZ</h4>
+                  <span id="det-cod" class="text-muted fw-bold">SKU: 1205001</span>
+                </div>
+                <div class="d-flex align-items-center">
+                  <div class="text-center px-3">
+                    <div class="small fw-bold text-muted">ACTUAL</div>
+                    <div id="det-ex-act" class="stock-big">10</div>
+                  </div>
+                  <div class="arrow-flow">➔</div>
+                  <div class="text-center px-3">
+                    <div class="small fw-bold text-muted">NUEVA</div>
+                    <div id="det-ex-sig" class="stock-next">7</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-md-3"><label class="small fw-bold">CANTIDAD</label><input type="number" id="m-cant" class="form-control form-control-lg fw-bold text-center" oninput="previsualizarStock()"></div>
+              <div class="col-md-4"><label class="small fw-bold">DESTINO / REF</label><input type="text" id="m-dest" class="form-control" placeholder="OC o Máquina"></div>
+              <div class="col-md-5"><label class="small fw-bold">COMENTARIOS</label><input type="text" id="m-com" class="form-control"></div>
+            </div>
+            <button class="btn btn-primary w-100 fw-bold mb-4" onclick="encolarMovimiento()">ADICIONAR AL LISTADO</button>
+          </div>
+
+          <h6 class="fw-bold border-bottom pb-2">MOVIMIENTOS PENDIENTES POR GUARDAR</h6>
+          <table class="table table-sm small">
+            <thead><tr class="table-light"><th>MOV</th><th>PRODUCTO</th><th>CANT</th><th>PREVIO</th><th>FINAL</th><th></th></tr></thead>
+            <tbody id="cola-body"></tbody>
+          </table>
+          <div class="text-end">
+            <button id="btn-save-all" class="btn btn-success fw-bold px-5 py-2 shadow d-none" onclick="guardarTodoEnSheets()">GUARDAR 0 MOVIMIENTOS</button>
+          </div>
+        </div>
+
+        <!-- Lado Derecho: Historial Reciente -->
+        <div class="col-md-4">
+        <h6 class="fw-bold mb-3 border-bottom pb-2">HISTORIAL DEL PRODUCTO</h6>
+        <div id="historial-body" class="historial-list text-center py-4">
+          <span class="text-muted italic small">Seleccione un producto para ver su historial de movimientos</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CATÁLOGO -->
+<div class="modal fade" id="modalIns" tabindex="-1" aria-labelledby="mod-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold" id="mod-title">ITEM DE CATÁLOGO</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body p-4 bg-light">
+        <input type="hidden" id="f-id">
+        <div class="row g-3">
+          <!-- Datos Generales -->
+          <div class="col-md-4">
+            <label class="small fw-bold">CÓDIGO (QR/BARRAS)</label>
+            <input type="text" id="f-cod" class="form-control form-control-sm shadow-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="small fw-bold">CATEGORÍA</label>
+            <select id="f-cat" class="form-select form-select-sm shadow-sm">
+              <option>REFACCION</option>
+              <option>HERRAMENTAL</option>
+              <option>CONSUMIBLE</option>
+              <option>LUBRICANTE</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="small fw-bold">UNIDAD</label>
+            <input type="text" id="f-uni" class="form-control form-control-sm shadow-sm" placeholder="PZA, JGO, L">
+          </div>
+          
+          <!-- Descripción Completa -->
+          <div class="col-md-12">
+            <label class="small fw-bold">DESCRIPCIÓN DETALLADA</label>
+            <input type="text" id="f-des" class="form-control form-control-sm shadow-sm">
+          </div>
+          
+          <!-- Gestión de Stock y Almacén -->
+          <div class="col-md-4">
+            <label class="small fw-bold">UBICACIÓN (PASILLO/GAVETA)</label>
+            <input type="text" id="f-ubi" class="form-control form-control-sm shadow-sm">
+          </div>
+          <div class="col-md-2">
+            <label class="small fw-bold">MÍNIMO</label>
+            <input type="number" id="f-min" class="form-control form-control-sm shadow-sm">
+          </div>
+          <div class="col-md-2">
+            <label class="small fw-bold">MÁXIMO</label>
+            <input type="number" id="f-max" class="form-control form-control-sm shadow-sm">
+          </div>
+          <div class="col-md-2">
+            <label class="small fw-bold">REORDEN</label>
+            <input type="number" id="f-reo" class="form-control form-control-sm shadow-sm">
+          </div>
+          <div class="col-md-2">
+            <label class="small fw-bold">ESTADO</label>
+            <select id="f-est" class="form-select form-select-sm shadow-sm">
+              <option value="OK">ACTIVO</option>
+              <option value="BAJA">DADO DE BAJA</option>
+            </select>
+          </div>
+
+          <!-- Especificaciones Técnicas -->
+          <div class="col-md-12">
+            <label class="small fw-bold">ESPECIFICACIONES ADICIONALES</label>
+            <textarea id="f-esp" class="form-control form-control-sm shadow-sm" rows="2"></textarea>
+          </div>
+          
+          <!-- Campos de Proveeduría -->
+          <div class="col-md-4">
+            <label class="small fw-bold text-uppercase">Proveedor Sugerido</label>
+            <input type="text" id="f-prov" class="form-control form-control-sm shadow-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="small fw-bold text-uppercase">Referencia Fábrica</label>
+            <input type="text" id="f-ref" class="form-control form-control-sm shadow-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="small fw-bold text-uppercase">Tipo Insumo</label>
+            <input type="text" id="f-tipo" class="form-control form-control-sm shadow-sm">
+          </div>
+
+          <!-- SECCIÓN DE ARCHIVO ADJUNTO (DRIVE) -->
+          <div class="col-md-12 mt-2">
+            <div class="p-3 border rounded bg-white shadow-sm" style="border-left: 5px solid var(--accent) !important;">
+              <label class="small fw-bold text-primary mb-2 d-block">📎 ADJUNTAR ARCHIVO (FICHA TÉCNICA / IMAGEN)</label>
+              <input type="file" id="f-file" class="form-control form-control-sm mb-2">
+              <!-- El div file-info guarda la URL actual en dataset para la lógica de reemplazo -->
+              <div id="file-info" class="small text-muted fw-bold" data-current-url="">Sin archivo adjunto</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer bg-light border-top">
+        <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">CANCELAR</button>
+        <button type="button" class="btn btn-primary px-5 fw-bold shadow" onclick="guardarItemCat()">
+          💾 GUARDAR ITEM
+        </button>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<script>
+  let DB = [];
+  let colaMovs = [];
+  let itemSel = null;
+  const userAct = "<?= usuario_inyectado ?>";
+
+  window.onload = () => {
+    cargarDatos();
+  };
+
+  function cargarDatos() {
+    google.script.run.withSuccessHandler(res => {
+      DB = res.catalogo;
+      renderExistencias();
+      renderHistorial(res.ultimosMov);
+      document.getElementById('loader').style.display = 'none';
+    }).getDatosInsumos();
+  }
+
+  // --- LOGICA EXISTENCIAS ---
+  function renderExistencias() {
+    const body = document.getElementById('exis-body');
+    body.innerHTML = "";
+    DB.slice(1).forEach(r => {
+      let badge = "st-ok";
+      if(r[11] === "CRITICO") badge = "st-critico";
+      else if(r[11] === "REORDEN") badge = "st-reorden";
+      if(r[11] === "BAJA") badge = "bg-secondary text-white";
+
+      // --- AJUSTE CLIP: Solo aparece si r[15] (Columna P) tiene algo ---
+      const hasFile = r[15] && r[15].toString().trim() !== "";
+      const btnClip = hasFile ? `<a href="${r[15]}" target="_blank" class="btn btn-sm p-0 me-2" title="Ver Adjunto" style="font-size:16px">📎</a>` : "";
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="fw-bold">${r[1]}</td>
+        <td>${r[3]}</td>
+        <td class="fw-900 fs-5">${r[6]}</td>
+        <td>${r[7]}</td>
+        <td>${r[8]}</td>
+        <td>${r[5]}</td>
+        <td><span class="badge ${badge}">${r[11]}</span></td>
+        <td>
+          <div class="d-flex align-items-center justify-content-center">
+            ${btnClip}
+            <button class="btn btn-sm btn-outline-dark" onclick="abrirModalCat('EDITAR', ${JSON.stringify(r).replace(/"/g, '&quot;')})">✎</button>
+          </div>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+}
+
+  function filtrarExistencias() {
+    const val = document.getElementById('cat-search').value.toLowerCase();
+    document.querySelectorAll('#exis-body tr').forEach(tr => {
+      tr.style.display = tr.innerText.toLowerCase().includes(val) ? "" : "none";
+    });
+  }
+
+  function abrirModalCat(modo, r = null) {
+    // 1. Limpiar siempre el input de archivo al abrir
+    document.getElementById('f-file').value = "";
+    const infoAdjunto = document.getElementById('file-info');
+    
+    if(modo === 'NUEVO') {
+      // --- CONFIGURACIÓN PARA NUEVO REGISTRO ---
+      document.getElementById('mod-title').innerText = "🆕 AGREGAR NUEVO ITEM AL CATÁLOGO";
+      document.getElementById('f-id').value = "NUEVO";
+      
+      // Limpiar todos los campos (incluyendo los 3 nuevos y especificaciones)
+      const campos = ['f-cod','f-cat','f-uni','f-des','f-ubi','f-min','f-max','f-reo','f-esp','f-prov','f-ref','f-tipo'];
+      campos.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.value = "";
+      });
+      
+      document.getElementById('f-est').value = "OK";
+      
+      // Reset de info de archivo
+      infoAdjunto.innerHTML = "Sin archivo adjunto";
+      infoAdjunto.dataset.currentUrl = ""; // Memoria vacía
+
+    } else {
+      // --- CONFIGURACIÓN PARA EDICIÓN ---
+      document.getElementById('mod-title').innerText = "✎ EDITAR ITEM ID: " + r[0];
+      document.getElementById('f-id').value = r[0];
+      document.getElementById('f-cod').value = r[1];
+      document.getElementById('f-cat').value = r[2];
+      document.getElementById('f-des').value = r[3];
+      document.getElementById('f-uni').value = r[4];
+      document.getElementById('f-ubi').value = r[5];
+      // Salto r[6] porque es el STOCK (no se edita aquí)
+      document.getElementById('f-min').value = r[7];
+      document.getElementById('f-max').value = r[8];
+      document.getElementById('f-reo').value = r[9];
+      document.getElementById('f-esp').value = r[10];
+      document.getElementById('f-est').value = r[11];
+      
+      // Cargar los 3 campos nuevos (M, N, O -> 12, 13, 14)
+      document.getElementById('f-prov').value = r[12] || "";
+      document.getElementById('f-ref').value = r[13] || "";
+      document.getElementById('f-tipo').value = r[14] || "";
+      
+      // GESTIÓN QUIRÚRGICA DE LA URL (Columna P -> Índice 15)
+      const urlActual = r[15] || "";
+      infoAdjunto.dataset.currentUrl = urlActual; // Guardamos la URL en el dataset para el backend
+      
+      if (urlActual !== "") {
+        infoAdjunto.innerHTML = `
+          <div class="d-flex align-items-center gap-2">
+            <a href="${urlActual}" target="_blank" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size:10px">
+              📂 VER ARCHIVO ACTUAL
+            </a>
+            <span class="text-success" style="font-size:10px">● Archivo vinculado</span>
+          </div>
+          <div class="mt-1 text-muted" style="font-size:9px italic">Si subes un archivo nuevo, el anterior se borrará automáticamente.</div>`;
+      } else {
+        infoAdjunto.innerHTML = `<span class="text-muted">Sin archivo adjunto actualmente.</span>`;
+      }
+    }
+
+    // Abrir el modal de Bootstrap
+    var modalElement = document.getElementById('modalIns');
+    var modalInstance = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+    modalInstance.show();
+}
+
+  async function guardarItemCat() {
+    const fileInput = document.getElementById('f-file');
+    let archivoData = null;
+
+    // 1. Mostrar Loader inmediatamente
+    document.getElementById('loader').style.display = 'flex';
+
+    try {
+        // 2. Procesar el archivo si el usuario seleccionó uno
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            
+            // Validar tamaño (Opcional, máx 10MB para evitar errores de Google)
+            if (file.size > 10 * 1024 * 1024) {
+                throw new Error("El archivo es demasiado grande (máximo 10MB)");
+            }
+
+            archivoData = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    resolve({
+                        base64: e.target.result.split(',')[1],
+                        type: file.type,
+                        name: file.name
+                    });
+                };
+                reader.onerror = (err) => reject("Error al leer el archivo");
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 3. Armar el objeto para el servidor
+        const item = {
+            id: document.getElementById('f-id').value,
+            codigo: document.getElementById('f-cod').value,
+            categoria: document.getElementById('f-cat').value,
+            descripcion: document.getElementById('f-des').value,
+            unidad: document.getElementById('f-uni').value,
+            ubicacion: document.getElementById('f-ubi').value,
+            minimo: document.getElementById('f-min').value,
+            maximo: document.getElementById('f-max').value,
+            reorden: document.getElementById('f-reo').value,
+            especificaciones: document.getElementById('f-esp').value,
+            estado: document.getElementById('f-est').value,
+            proveedor: document.getElementById('f-prov').value,
+            referencia: document.getElementById('f-ref').value,
+            tipo_insumo: document.getElementById('f-tipo').value,
+            // Recuperamos la URL vieja que guardamos en abrirModalCat
+            url_existente: document.getElementById('file-info').dataset.currentUrl || "",
+            archivo: archivoData
+        };
+
+        // 4. Enviar al servidor
+        google.script.run.withSuccessHandler(res => {
+            if (res === "OK") {
+                // Cerrar modal y limpiar
+                const modalEl = document.getElementById('modalIns');
+                const modalInst = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modalInst.hide();
+                
+                Swal.fire({
+                  title: "¡Guardado!",
+                  text: "El registro y el archivo se actualizaron correctamente.",
+                  icon: "success",
+                  timer: 2000
+                });
+                
+                cargarDatos(); // Refresca la tabla y el clip 📎 aparecerá
+            } else {
+                Swal.fire("Error de Servidor", res, "error");
+                document.getElementById('loader').style.display = 'none';
+            }
+        }).withFailureHandler(err => {
+            Swal.fire("Error Crítico", err.message, "error");
+            document.getElementById('loader').style.display = 'none';
+        }).crudCatalogoInsumos(item);
+
+    } catch (error) {
+        Swal.fire("Atención", error.message, "warning");
+        document.getElementById('loader').style.display = 'none';
+    }
+}
+
+function guardarTodoEnSheets() {
+    document.getElementById('loader').style.display = 'flex'; // Mostrar loader TOOL CN
+    
+    google.script.run.withSuccessHandler(res => {
+      colaMovs = []; // Limpiar lista local
+      renderCola();
+      Swal.fire("Completado", "Inventario actualizado en la nube", "success");
+      
+      // RECARGA LÓGICA (No blanca)
+      cargarDatos(); 
+    }).guardarMovimientosInsumos(colaMovs);
+}
+
+  // --- LOGICA MOVIMIENTOS ---
+  function buscarInsumo(el) {
+    const val = el.value.toLowerCase();
+    const resBox = document.getElementById('m-res');
+    resBox.innerHTML = "";
+    if(val.length < 2) { resBox.classList.add('d-none'); return; }
+    
+    const matches = DB.slice(1).filter(r => (r[1] + " " + r[3]).toLowerCase().includes(val));
+    if(matches.length > 0) {
+      resBox.classList.remove('d-none');
+      matches.slice(0, 8).forEach(m => {
+        const div = document.createElement('div');
+        div.className = "autocomplete-item";
+        div.innerHTML = `<strong>${m[1]}</strong> - ${m[3]} (Stock: ${m[6]})`;
+        div.onclick = () => seleccionarInsumo(m);
+        resBox.appendChild(div);
+      });
+    }
+  }
+
+  function seleccionarInsumo(m) {
+    itemSel = m;
+    document.getElementById('m-busc').value = m[1];
+    document.getElementById('m-res').classList.add('d-none');
+    document.getElementById('m-detalle-container').classList.remove('d-none');
+    
+    document.getElementById('det-desc').innerText = m[3];
+    document.getElementById('det-cod').innerText = "SKU: " + m[1];
+    
+    // Calcular Stock en Caliente (Saldo base + lo que hay en la cola local)
+    const stockBase = parseFloat(m[6] || 0);
+    const sumaCola = colaMovs.filter(x => x.codigo === m[1]).reduce((acc, x) => acc + (x.tipo === 'ENTRADA' ? x.cantidad : -x.cantidad), 0);
+    
+    document.getElementById('det-ex-act').innerText = stockBase + sumaCola;
+    previsualizarStock();
+    document.getElementById('m-cant').focus();
+
+    // --- AJUSTE QUIRÚRGICO: CARGAR HISTORIAL ESPECÍFICO ---
+    document.getElementById('historial-body').innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div><br><span class="small">Buscando historial...</span>';
+    
+    google.script.run.withSuccessHandler(historial => {
+      renderHistorial(historial);
+    }).getHistorialEspecificoInsumo(m[1]);
+}
+
+  function previsualizarStock() {
+    if(!itemSel) return;
+    const act = parseFloat(document.getElementById('det-ex-act').innerText);
+    const cant = parseFloat(document.getElementById('m-cant').value || 0);
+    const tipo = document.getElementById('m-tipo').value;
+    const sig = (tipo === 'ENTRADA') ? act + cant : act - cant;
+    
+    document.getElementById('det-ex-sig').innerText = sig;
+    document.getElementById('det-ex-sig').style.color = sig < 0 ? 'red' : '#0d6efd';
+  }
+
+  function encolarMovimiento() {
+    const cant = parseFloat(document.getElementById('m-cant').value);
+    const sig = parseFloat(document.getElementById('det-ex-sig').innerText);
+    if(!cant || cant <= 0) return Swal.fire("Error","Ingresa una cantidad válida","error");
+    if(sig < 0) return Swal.fire("Stock Negativo","No puedes sacar más de lo que hay en existencia","error");
+
+    const mxDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
+    const mov = {
+      tipo: document.getElementById('m-tipo').value,
+      codigo: itemSel[1],
+      descripcion: itemSel[3],
+      cantidad: cant,
+      previo: parseFloat(document.getElementById('det-ex-act').innerText),
+      final: sig,
+      fecha: mxDate,
+      usuario: userAct,
+      destino: document.getElementById('m-dest').value,
+      referencia: document.getElementById('m-dest').value,
+      comentarios: document.getElementById('m-com').value
+    };
+
+    colaMovs.push(mov);
+    renderCola();
+    
+    // Limpiar campos para el siguiente
+    document.getElementById('m-busc').value = "";
+    document.getElementById('m-cant').value = "";
+    document.getElementById('m-detalle-container').classList.add('d-none');
+    document.getElementById('m-busc').focus();
+  }
+
+  function renderCola() {
+    const b = document.getElementById('cola-body');
+    b.innerHTML = "";
+    colaMovs.forEach((m, i) => {
+      const tr = document.createElement('tr');
+      const cls = m.tipo === 'ENTRADA' ? 'text-success' : 'text-danger';
+      tr.innerHTML = `
+        <td class="fw-bold ${cls}">${m.tipo}</td>
+        <td><b>${m.codigo}</b><br>${m.descripcion}</td>
+        <td>${m.cantidad}</td><td>${m.previo}</td><td>${m.final}</td>
+        <td><button class="btn btn-sm btn-link text-danger" onclick="colaMovs.splice(${i},1); renderCola();">🗑</button></td>
+      `;
+      b.appendChild(tr);
+    });
+    
+    const btn = document.getElementById('btn-save-all');
+    btn.innerText = `GUARDAR ${colaMovs.length} MOVIMIENTOS`;
+    btn.classList.toggle('d-none', colaMovs.length === 0);
+  }
+
+  function renderHistorial(movs) {
+    const hBody = document.getElementById('historial-body');
+    hBody.innerHTML = "";
+    hBody.classList.remove('text-center'); // Quitar centrado de "cargando"
+
+    if (!movs || movs.length === 0) {
+      hBody.innerHTML = '<div class="alert alert-light border small">Este producto no tiene movimientos registrados previamente.</div>';
+      return;
+    }
+
+    movs.forEach(m => {
+      const div = document.createElement('div');
+      div.className = "historial-item";
+      // m[2] = TIPO, m[1] = FECHA, m[4] = CANTIDAD, m[5] = USUARIO, m[6] = DESTINO
+      div.innerHTML = `
+        <div class="d-flex justify-content-between fw-bold">
+          <span class="${m[2]==='ENTRADA'?'text-success':'text-danger'}">${m[2]}</span>
+          <span class="text-muted" style="font-size:10px">${m[1]}</span>
+        </div>
+        <div>Cant: <b>${m[4]}</b> | Por: <b>${m[5]}</b></div>
+        <div class="opacity-75 italic" style="font-size:10px">Destino/Ref: ${m[6]}</div>
+      `;
+      hBody.appendChild(div);
+    });
+}
+
+  function iniciarScanner() {
+    Swal.fire({
+      title: 'Escaneando...',
+      html: '<div id="reader" style="width: 100%"></div>',
+      showConfirmButton: false,
+      didOpen: () => {
+        const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+        scanner.render((text) => {
+          document.getElementById('m-busc').value = text;
+          buscarInsumo({value: text});
+          scanner.clear();
+          Swal.close();
+        });
+      }
+    });
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

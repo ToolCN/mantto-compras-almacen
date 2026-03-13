@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary: #1a237e;
+      --bg: #f0f4f8;
+      --danger: #d32f2f;
+      --success: #2e7d32;
+      --warning: #f57f17;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { font-family: 'Roboto', sans-serif; background: var(--bg); margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: var(--bg);
+      margin: 0; padding: 0;
+      min-height: 100vh;
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: pan-y;
+    }
+
+    /* ══ OVERLAY / LOADING ══ */
+    #overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.98); z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    }
+    .spinner {
+      border: 6px solid #f3f3f3; border-top: 6px solid var(--primary);
+      border-radius: 50%; width: 50px; height: 50px;
+      animation: spin 1s linear infinite; margin-bottom: 15px;
+    }
+    @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+    .progress-box { width: 80%; background: #eee; height: 12px; border-radius: 6px; margin-top: 15px; overflow: hidden; display: none; }
+    .progress-fill { width: 0%; height: 100%; background: var(--primary); transition: width 0.1s; }
+
+    #success-content { display: none; flex-direction: column; align-items: center; }
+    .btn-final {
+      width: 260px; padding: 16px; border: none; border-radius: 12px;
+      font-weight: 900; cursor: pointer; margin-top: 12px;
+      font-size: 15px; text-transform: uppercase; color: white;
+    }
+
+    /* ══ LOGIN ══ */
+    #login-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #0f172a, #1e3a5f);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9998; padding: 20px;
+    }
+    .login-card {
+      background: white; padding: 2.5rem; border-radius: 20px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: center;
+    }
+    .login-field {
+      display: flex; align-items: center;
+      background: #f1f5f9; border-radius: 10px; margin-bottom: 12px;
+      overflow: hidden; border: 2px solid transparent; transition: .2s;
+    }
+    .login-field:focus-within { border-color: var(--primary); background: white; }
+    .login-field i { padding: 0 14px; color: #94a3b8; font-size: 15px; }
+    .login-field input {
+      flex: 1; padding: 13px 10px 13px 0; border: none; background: transparent;
+      font-size: 15px; outline: none; font-family: 'Roboto', sans-serif;
+    }
+    #login-error {
+      display: none; background: #fee2e2; color: #b91c1c;
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+      font-size: 13px; font-weight: 600;
+    }
+    .btn-login {
+      width: 100%; padding: 15px; border: none; border-radius: 10px;
+      background: var(--primary); color: white; font-size: 16px;
+      font-weight: 900; cursor: pointer; transition: .2s;
+    }
+    .btn-login:active { background: #283593; }
+
+    /* Autocomplete */
+    .ac-wrap { position: relative; }
+    .ac-list {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: white; border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.15); z-index: 200;
+      max-height: 200px; overflow-y: auto; display: none;
+      border: 1px solid #e2e8f0; margin-top: 4px;
+    }
+    .ac-item {
+      padding: 10px 14px; cursor: pointer; font-size: 14px;
+      font-weight: 600; color: #0f172a; transition: .15s;
+    }
+    .ac-item:hover { background: #eff6ff; color: #1d4ed8; }
+
+    /* ══ CONTAINER PRINCIPAL ══ */
+    .main-wrap { padding: 14px; padding-bottom: 40px; touch-action: pan-y; }
+    .container {
+      max-width: 520px; margin: auto; background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    /* ══ HEADER ══ */
+    .page-header {
+      background: var(--primary); color: white;
+      padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .page-header h2 { margin: 0; font-size: 16px; font-weight: 900; letter-spacing: .03em; }
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .user-badge-header {
+      background: rgba(255,255,255,.15); border-radius: 8px;
+      padding: 5px 10px; font-size: 11px; font-weight: 900;
+      display: flex; align-items: center; gap: 6px;
+      max-width: 100%;
+    }
+    .user-badge-header span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-logout {
+      background: none; border: none; color: rgba(255,255,255,.75);
+      font-size: 10px; font-weight: 900; cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
+      text-transform: uppercase; letter-spacing: .03em;
+      padding: 0; touch-action: manipulation;
+    }
+    .btn-logout:active { color: white; }
+
+    /* ══ TICKET DE ORDEN ══ */
+    .ticket-section { padding: 16px; background: #fafafa; border-bottom: 1px solid #eee; }
+    .ticket-card {
+      background: white; border: 2px solid #e0e0e0; border-radius: 12px;
+      overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .ticket-top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-bottom: 2px solid #eee;
+      background: #f8fafc;
+    }
+    .ticket-folio { font-size: 20px; font-weight: 900; color: var(--danger); letter-spacing: 1px; }
+    .ticket-estado {
+      font-size: 11px; font-weight: 900; padding: 4px 12px;
+      border-radius: 20px; text-transform: uppercase;
+    }
+    .estado-abierta { background: #e3f2fd; color: #1565c0; }
+
+    .ticket-body { padding: 14px; }
+    .dato-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid #f5f5f5;
+      font-size: 14px;
+    }
+    .dato-row:last-child { border-bottom: none; }
+    .dato-label {
+      font-size: 10px; font-weight: 900; color: #888;
+      text-transform: uppercase; letter-spacing: .04em;
+      min-width: 70px; padding-top: 1px;
+    }
+    .dato-valor { font-weight: 700; color: #1a1a2e; flex: 1; }
+    .falla-box {
+      background: #fff8e1; border: 1.5px solid #fbc02d;
+      border-radius: 10px; padding: 12px 14px; margin-top: 8px;
+    }
+    .falla-label { font-size: 10px; font-weight: 900; color: #f57f17; text-transform: uppercase; margin-bottom: 4px; }
+    .falla-texto { font-weight: 700; color: #1a1a2e; font-size: 14px; line-height: 1.4; text-transform: uppercase; }
+
+    /* ══ SECCIÓN DE ACCIONES ══ */
+    .actions-section { padding: 16px; }
+    .section-label {
+      font-size: 10px; font-weight: 900; color: #666;
+      text-transform: uppercase; letter-spacing: .05em;
+      margin-bottom: 8px; display: block;
+    }
+
+    /* Botón para seleccionar técnico */
+    .btn-tecnico {
+      width: 100%; padding: 14px 16px;
+      border: 2px dashed #90caf9; border-radius: 12px;
+      background: #e3f2fd; color: #1565c0;
+      font-size: 15px; font-weight: 900;
+      cursor: pointer; transition: .2s;
+      display: flex; align-items: center; justify-content: space-between;
+      touch-action: manipulation;
+      margin-bottom: 14px;
+    }
+    .btn-tecnico:active { background: #bbdefb; }
+    .btn-tecnico.selected {
+      border-style: solid; border-color: var(--primary);
+      background: #e8eaf6; color: var(--primary);
+    }
+    .btn-tecnico span { flex: 1; text-align: left; }
+    .btn-tecnico i { font-size: 18px; }
+
+    /* Botones de acción */
+    .btn-action {
+      width: 100%; padding: 16px; margin-bottom: 10px;
+      border: none; border-radius: 12px;
+      font-weight: 900; cursor: pointer; color: white;
+      font-size: 16px; transition: .2s;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      touch-action: manipulation;
+    }
+    .btn-action:active { transform: scale(.98); }
+    .btn-aceptar { background: #0288d1; }
+    .btn-cancelar { background: var(--danger); }
+
+    /* ══ MODAL TÉCNICOS (pantalla completa) ══ */
+    #modal-tecnicos {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: white; z-index: 100000;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      display: none; flex-direction: column;
+    }
+    .modal-header-tec {
+      position: sticky; top: 0; background: var(--primary); color: white;
+      padding: 16px 20px; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 4px 10px rgba(0,0,0,.2);
+    }
+    .modal-header-tec h3 { margin: 0; font-size: 17px; font-weight: 900; }
+    .btn-modal-back {
+      background: rgba(255,255,255,.15); border: none; color: white;
+      border-radius: 8px; padding: 8px 14px; font-size: 13px;
+      font-weight: 900; cursor: pointer; touch-action: manipulation;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-modal-back:active { background: rgba(255,255,255,.3); }
+    .modal-body-tec { padding: 16px; flex: 1; }
+    .tec-card {
+      display: flex; align-items: center; gap: 14px;
+      width: 100%; padding: 16px 18px; margin-bottom: 10px;
+      border: 1.5px solid #e0e0e0; border-radius: 12px;
+      background: #fff; text-align: left;
+      cursor: pointer; transition: .15s;
+      touch-action: manipulation;
+    }
+    .tec-card:active { background: #f0f4ff; border-color: var(--primary); transform: scale(.99); }
+    .tec-avatar {
+      width: 46px; height: 46px; border-radius: 50%;
+      background: #e8eaf6; display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: var(--primary); flex-shrink: 0;
+    }
+    .tec-nombre { font-size: 15px; font-weight: 900; color: #1a1a2e; }
+    .tec-sub { font-size: 12px; color: #888; font-weight: 500; margin-top: 2px; }
+
+    /* ══ POPUP ALERTA PERMISO ══ */
+    #popup-permiso {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7); z-index: 999999;
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .popup-card {
+      background: white; border-radius: 20px; padding: 2rem;
+      max-width: 360px; width: 100%; text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,.4);
+    }
+    .popup-icon { font-size: 60px; margin-bottom: 10px; }
+    .popup-title { font-size: 18px; font-weight: 900; color: var(--danger); margin-bottom: 8px; }
+    .popup-msg { font-size: 14px; color: #555; margin-bottom: 20px; line-height: 1.5; }
+    .btn-popup-ok {
+      padding: 13px 40px; border: none; border-radius: 10px;
+      background: var(--danger); color: white; font-size: 15px;
+      font-weight: 900; cursor: pointer; width: 100%;
+    }
+
+    /* ══ TICKET OCULTO PARA html2canvas ══ */
+    #ticket-render {
+      position: absolute; left: -9999px;
+      width: 380px; background: white;
+      border: 4px double #000; color: #000;
+    }
+    .watermark {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 55px; font-weight: 900; border: 8px solid;
+      padding: 10px; display: none; z-index: 100; opacity: 0.25;
+    }
+    .wm-iniciado { color: #0288d1; border-color: #0288d1; }
+    .wm-cancelado { color: #d32f2f; border-color: #d32f2f; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ OVERLAY LOADING / SUCCESS ══════════ -->
+<div id="overlay">
+  <div id="loading-content">
+    <div class="spinner"></div>
+    <h2 id="msg" style="color:var(--primary); margin:0;">Comprobando estado...</h2>
+    <p id="msg-sub" style="color:#666; margin-top:6px;">Por favor espere</p>
+    <div id="p-box" class="progress-box"><div id="bar" class="progress-fill"></div></div>
+  </div>
+  <div id="success-content">
+    <div style="background:#e8f5e9; width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:16px;">
+      <span style="color:var(--success); font-size:45px;">✔</span>
+    </div>
+    <h2 style="color:var(--primary); margin:0;">¡ORDEN PROCESADA!</h2>
+    <p style="color:#555; margin:10px 0 20px;">La orden fue actualizada y notificada correctamente.</p>
+    <button class="btn-final" style="background:#333;" onclick="window.top.close()">
+      <i class="fas fa-times"></i> Cerrar Pestaña
+    </button>
+  </div>
+</div>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" width="150" style="margin-bottom:20px; display:block; margin-left:auto; margin-right:auto;">
+    <h4 style="font-weight:900; color:#0f172a; margin-bottom:4px; font-size:18px;">Gestión de Mantenimiento</h4>
+    <p style="color:#64748b; font-size:13px; margin-bottom:20px;">Ingresa tus credenciales para continuar</p>
+    <div id="login-error">
+      <i class="fas fa-exclamation-circle"></i> <span id="login-error-txt">Usuario o contraseña incorrectos</span>
+    </div>
+    <div class="ac-wrap">
+      <div class="login-field">
+        <i class="fas fa-user"></i>
+        <input type="text" id="userInput" placeholder="Usuario..."
+          autocomplete="off" oninput="filtrarAC()" onblur="setTimeout(cerrarAC, 200)">
+      </div>
+      <div class="ac-list" id="acList"></div>
+    </div>
+    <div class="login-field">
+      <i class="fas fa-lock"></i>
+      <input type="password" id="passInput" placeholder="Contraseña"
+        onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn-login" onclick="doLogin()">
+      <i class="fas fa-sign-in-alt" style="margin-right:8px;"></i>INICIAR SESIÓN
+    </button>
+  </div>
+</div>
+
+<!-- ══════════ POPUP: SIN PERMISO ══════════ -->
+<div id="popup-permiso">
+  <div class="popup-card">
+    <div class="popup-icon">🚫</div>
+    <div class="popup-title">ACCESO DENEGADO</div>
+    <div class="popup-msg">NO TIENES PERMISO PARA GESTIONAR LA ORDEN</div>
+    <button class="btn-popup-ok" onclick="cerrarPopupPermiso()">ACEPTAR</button>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: SELECCIONAR TÉCNICO ══════════ -->
+<div id="modal-tecnicos" style="display:none; flex-direction:column;">
+  <div class="modal-header-tec">
+    <h3><i class="fas fa-user-hard-hat" style="margin-right:8px;"></i>Seleccionar Técnico</h3>
+    <button class="btn-modal-back" onclick="cerrarModalTecnicos()">
+      <i class="fas fa-arrow-left"></i> Volver
+    </button>
+  </div>
+  <div class="modal-body-tec" id="lista-tecnicos">
+    <div style="text-align:center; padding:40px; color:#aaa;">
+      <div class="spinner" style="margin:auto;"></div>
+      <p>Cargando técnicos...</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ CONTENIDO PRINCIPAL ══════════ -->
+<div class="main-wrap" id="main-ui" style="display:none;">
+  <div class="container">
+
+    <!-- HEADER -->
+    <div class="page-header">
+      <h2><i class="fas fa-tools" style="margin-right:8px;"></i>GESTIÓN MANTTO</h2>
+      <div class="header-right">
+        <div class="user-badge-header">
+          <i class="fas fa-user-check"></i>
+          <span id="labelUsuario">...</span>
+        </div>
+        <button class="btn-logout" onclick="cerrarSesion()">
+          <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+        </button>
+      </div>
+    </div>
+
+    <!-- TICKET DE ORDEN -->
+    <div class="ticket-section">
+      <span class="section-label"><i class="fas fa-file-alt" style="margin-right:5px;"></i>Detalle de la Orden</span>
+      <div class="ticket-card">
+        <div class="ticket-top">
+          <div>
+            <div style="font-size:10px; font-weight:900; color:#888; text-transform:uppercase; margin-bottom:2px;">Folio</div>
+            <div class="ticket-folio" id="h-folio">—</div>
+          </div>
+          <div class="ticket-estado estado-abierta" id="h-estado">ABIERTA</div>
+        </div>
+        <div class="ticket-body">
+          <div class="dato-row">
+            <span class="dato-label">📍 Área</span>
+            <span class="dato-valor" id="h-area">—</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">⚙️ Máquina</span>
+            <span class="dato-valor" id="h-maquina">—</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">🏷️ Tipo</span>
+            <span class="dato-valor" id="h-tipo">—</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">🔺 Prioridad</span>
+            <span class="dato-valor" id="h-prioridad">—</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">👤 Solicitante</span>
+            <span class="dato-valor" id="h-solicitante">—</span>
+          </div>
+          <div class="dato-row">
+            <span class="dato-label">📅 Fecha</span>
+            <span class="dato-valor" id="h-fecha">—</span>
+          </div>
+          <div class="falla-box">
+            <div class="falla-label"><i class="fas fa-exclamation-triangle" style="margin-right:4px;"></i>Descripción de Falla</div>
+            <div class="falla-texto" id="h-falla">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCIONES -->
+    <div class="actions-section">
+      <span class="section-label"><i class="fas fa-user-hard-hat" style="margin-right:5px;"></i>Asignar Técnico</span>
+
+      <button class="btn-tecnico" id="btn-tecnico-sel" onclick="abrirModalTecnicos()">
+        <span id="txt-tecnico-sel">Toque para asignar técnico...</span>
+        <i class="fas fa-chevron-right"></i>
+      </button>
+
+      <span class="section-label" style="margin-top:4px;"><i class="fas fa-check-circle" style="margin-right:5px;"></i>Acción</span>
+
+      <button class="btn-action btn-aceptar" onclick="procesar('ACEPTAR')">
+        <i class="fas fa-play-circle"></i> ACEPTAR E INICIAR
+      </button>
+      <button class="btn-action btn-cancelar" onclick="procesar('CANCELAR')">
+        <i class="fas fa-times-circle"></i> CANCELAR ORDEN
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════ TICKET OCULTO PARA IMAGEN ══════════ -->
+<div id="ticket-render" style="position:absolute;left:-9999px;width:450px;background:white;box-sizing:border-box;font-family:Roboto,sans-serif;">
+ 
+  <!-- Marca de agua -->
+  <div id="marcaAgua" class="watermark"></div>
+ 
+  <!-- Banner superior (se colorea con JS) -->
+  <div id="tr-banner-top" style="text-align:center;font-weight:900;padding:12px;font-size:15px;text-transform:uppercase;"></div>
+ 
+  <!-- Cuerpo del ticket -->
+  <div style="padding:25px;color:#000;">
+ 
+    <!-- Encabezado: logo + folio -->
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #000;padding-bottom:12px;">
+      <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" width="110">
+      <div style="text-align:right;">
+        <small style="font-weight:900;font-size:10px;">CLAVOS NACIONALES CN SA DE CV</small><br>
+        <b id="tr-folio" style="font-size:26px;color:red;"></b><br>
+        <small id="tr-fecha" style="font-weight:bold;font-size:11px;"></small>
+      </div>
+    </div>
+ 
+    <!-- Datos de la orden -->
+    <div style="margin-top:16px;font-size:15px;line-height:1.8;">
+      <div>📍 ÁREA: <b id="tr-area"></b></div>
+      <div>⚙️ MÁQUINA: <b id="tr-maquina"></b></div>
+      <div>👤 TÉCNICO: <b id="tr-tecnico"></b></div>
+      <div style="font-size:13px;">⚠️ PARO MÁQUINA: <b id="tr-tm"></b></div>
+      <div style="font-size:13px;">🛠 TIPO: <span id="tr-tipo"></span></div>
+ 
+      <!-- Falla -->
+      <div style="margin-top:14px;border:2px solid #000;padding:14px;background:#f9f9f9;">
+        <small style="font-size:10px;font-weight:900;color:#555;">REPORTE DE FALLA:</small><br>
+        <b id="tr-falla" style="font-size:18px;line-height:1.2;text-transform:uppercase;"></b>
+      </div>
+ 
+      <!-- Foto de falla (oculta por defecto, se muestra si hay URL) -->
+      <div id="tr-foto-wrap" style="margin-top:14px;border:2px solid #000;display:none;">
+        <img id="tr-foto-img" src="" style="width:100%;display:block;max-height:300px;object-fit:cover;"
+             crossorigin="anonymous">
+      </div>
+ 
+    </div>
+  </div>
+ 
+  <!-- Banner inferior (mismo color que el superior) -->
+  <div id="tr-banner-bottom" style="text-align:center;font-weight:900;padding:12px;font-size:15px;text-transform:uppercase;"></div>
+</div>
+
+<script>
+// ══ USUARIOS AUTORIZADOS ══
+const USUARIOS_PERMITIDOS = ["DAVID MONDRAGON", "EDI ZUÑIGA", "EZEQUIEL VELAZQUEZ", "JORGE SANCHEZ", "ROGELIO TORRES"];
+
+// ══ STORAGE KEYS ══
+const SK_USER = "gmanto_usuario";
+const SK_PASS = "gmanto_pass";
+
+let datos = null;
+let tecnicoSeleccionado = "";
+let listaTecnicos = [];
+
+const folio = "<?!= folio_inyectado ?>";
+const USUARIO_GAS = "<?!= usuario_inyectado ?>";
+
+// ══════════════════════════
+//  AUTOCOMPLETE LOGIN
+// ══════════════════════════
+function filtrarAC() {
+  const val = document.getElementById('userInput').value.trim().toUpperCase();
+  const list = document.getElementById('acList');
+  list.innerHTML = "";
+  if (!val) { list.style.display = "none"; return; }
+  const matches = USUARIOS_PERMITIDOS.filter(u => u.includes(val));
+  if (matches.length === 0) { list.style.display = "none"; return; }
+  matches.forEach(u => {
+    const d = document.createElement('div');
+    d.className = 'ac-item';
+    d.textContent = u;
+    d.onmousedown = () => {
+      document.getElementById('userInput').value = u;
+      list.style.display = "none";
+      document.getElementById('passInput').focus();
+    };
+    list.appendChild(d);
+  });
+  list.style.display = "block";
+}
+function cerrarAC() {
+  document.getElementById('acList').style.display = "none";
+}
+
+// ══════════════════════════
+//  LOGIN
+// ══════════════════════════
+function doLogin() {
+  const usuario = document.getElementById('userInput').value.trim().toUpperCase();
+  const pass    = document.getElementById('passInput').value;
+
+  if (!usuario || !pass) {
+    mostrarErrorLogin("Completa usuario y contraseña.");
+    return;
+  }
+
+  // Verificar si el usuario está en la lista de permitidos ANTES de llamar al servidor
+  if (!USUARIOS_PERMITIDOS.includes(usuario)) {
+    mostrarPopupPermiso();
+    return;
+  }
+
+  // Validar contra Google Sheets
+  document.getElementById('login-error').style.display = "none";
+  google.script.run
+    .withSuccessHandler(res => {
+      if (res && res.ok) {
+        // Guardar en localStorage para no pedir login cada vez
+        try {
+          localStorage.setItem(SK_USER, usuario);
+          localStorage.setItem(SK_PASS, pass);
+        } catch(e) {}
+        entrarApp(usuario);
+      } else {
+        mostrarErrorLogin("Usuario o contraseña incorrectos.");
+      }
+    })
+    .withFailureHandler(() => mostrarErrorLogin("Error de conexión. Intenta de nuevo."))
+    .validarLogin(usuario, pass);
+}
+
+function mostrarErrorLogin(msg) {
+  const el = document.getElementById('login-error');
+  document.getElementById('login-error-txt').textContent = msg;
+  el.style.display = "block";
+}
+
+function mostrarPopupPermiso() {
+  document.getElementById('popup-permiso').style.display = "flex";
+}
+function cerrarPopupPermiso() {
+  document.getElementById('popup-permiso').style.display = "none";
+}
+
+function entrarApp(usuario) {
+  document.getElementById('login-screen').style.display = "none";
+  document.getElementById('labelUsuario').textContent = usuario;
+  cargarOrden();
+}
+
+// ══════════════════════════
+//  INICIO
+// ══════════════════════════
+window.onload = () => {
+  // Intentar login automático con sesión guardada
+  let savedUser = null;
+  let savedPass = null;
+  try {
+    savedUser = localStorage.getItem(SK_USER);
+    savedPass = localStorage.getItem(SK_PASS);
+  } catch(e) {}
+
+  if (savedUser && savedPass && USUARIOS_PERMITIDOS.includes(savedUser.toUpperCase())) {
+    // Validar contra servidor en segundo plano
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res && res.ok) {
+          entrarApp(savedUser.toUpperCase());
+        } else {
+          // Sesión inválida, pedir login
+          try { localStorage.removeItem(SK_USER); localStorage.removeItem(SK_PASS); } catch(e) {}
+          mostrarLogin();
+        }
+      })
+      .withFailureHandler(() => mostrarLogin())
+      .validarLogin(savedUser.toUpperCase(), savedPass);
+  } else {
+    mostrarLogin();
+  }
+};
+
+function mostrarLogin() {
+  document.getElementById('overlay').style.display = "none";
+  document.getElementById('login-screen').style.display = "flex";
+}
+
+function cargarOrden() {
+  document.getElementById('overlay').style.display = "flex";
+  document.getElementById('msg').textContent = "Cargando orden...";
+
+  // Cargar técnicos
+  google.script.run
+    .withSuccessHandler(list => {
+      // Filtrar vacantes
+      listaTecnicos = list.filter(t => !t.toUpperCase().includes("VACANTE"));
+    })
+    .getTecnicos();
+
+  // Cargar datos de la orden
+  google.script.run
+    .withSuccessHandler(res => {
+      if (!res) {
+        document.getElementById('msg').textContent = "❌ FOLIO NO ENCONTRADO";
+        document.getElementById('msg-sub').textContent = "Verifica el enlace e intenta de nuevo.";
+        return;
+      }
+      if (res.estado !== "ABIERTA") {
+        document.getElementById('msg').textContent = "⚠️ ORDEN YA GESTIONADA";
+        document.getElementById('msg-sub').textContent = `Estado actual: ${res.estado}`;
+        return;
+      }
+      datos = res;
+      llenarDetalles(res);
+      document.getElementById('overlay').style.display = "none";
+      document.getElementById('main-ui').style.display = "block";
+    })
+    .withFailureHandler(() => {
+      document.getElementById('msg').textContent = "❌ Error al cargar la orden";
+      document.getElementById('msg-sub').textContent = "Intenta recargar la página.";
+    })
+    .getOrdenPorFolio(folio);
+}
+
+function llenarDetalles(res) {
+  // Llenar panel de información visible
+  document.getElementById('h-folio').textContent       = res.folio       || "—";
+  document.getElementById('h-area').textContent        = res.area        || "—";
+  document.getElementById('h-maquina').textContent     = res.maquina     || "—";
+  document.getElementById('h-tipo').textContent        = res.tipo        || "—";
+  document.getElementById('h-prioridad').textContent   = res.prioridad   || "—";
+  document.getElementById('h-solicitante').textContent = res.solicitante || "—";
+  document.getElementById('h-fecha').textContent       = res.fecha       || "—";
+  document.getElementById('h-falla').textContent       = res.falla       || "—";
+ 
+  // Llenar campos base del ticket oculto
+  document.getElementById('tr-folio').textContent   = res.folio   || "";
+  document.getElementById('tr-area').textContent    = res.area    || "";
+  document.getElementById('tr-maquina').textContent = res.maquina || "";
+  document.getElementById('tr-tm').textContent      = res.tm      || "NO";
+  document.getElementById('tr-tipo').textContent    = res.tipo    || "";
+  document.getElementById('tr-falla').textContent   = (res.falla  || "").toUpperCase();
+ 
+  // Foto en base64 (convertida en GAS, html2canvas SÍ puede renderizarla)
+  var fotoWrap = document.getElementById('tr-foto-wrap');
+  var fotoImg  = document.getElementById('tr-foto-img');
+  if (res.fotoBase64 && res.fotoBase64.trim() !== "") {
+    fotoImg.src            = res.fotoBase64;
+    fotoWrap.style.display = "block";
+  } else {
+    fotoImg.src            = "";
+    fotoWrap.style.display = "none";
+  }
+}
+
+// ══════════════════════════
+//  MODAL TÉCNICOS
+// ══════════════════════════
+function abrirModalTecnicos() {
+  const modal = document.getElementById('modal-tecnicos');
+  modal.style.display = "flex";
+
+  const lista = document.getElementById('lista-tecnicos');
+
+  if (listaTecnicos.length === 0) {
+    // Si aún no cargaron, intentar de nuevo
+    lista.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa;"><div class="spinner" style="margin:auto;"></div><p>Cargando técnicos...</p></div>`;
+    google.script.run
+      .withSuccessHandler(list => {
+        listaTecnicos = list.filter(t => !t.toUpperCase().includes("VACANTE"));
+        renderizarTecnicos();
+      })
+      .getTecnicos();
+  } else {
+    renderizarTecnicos();
+  }
+}
+
+function renderizarTecnicos() {
+  const lista = document.getElementById('lista-tecnicos');
+  lista.innerHTML = "";
+
+  if (listaTecnicos.length === 0) {
+    lista.innerHTML = `<p style="text-align:center;color:#aaa;padding:30px;">No hay técnicos disponibles.</p>`;
+    return;
+  }
+
+  // Agregar opción "Sin asignar" al inicio
+  const btnSin = document.createElement('button');
+  btnSin.className = 'tec-card';
+  btnSin.innerHTML = `
+    <div class="tec-avatar">🚫</div>
+    <div>
+      <div class="tec-nombre">Sin asignar</div>
+      <div class="tec-sub">Dejar técnico vacío</div>
+    </div>
+  `;
+  btnSin.addEventListener('click', function() { seleccionarTecnico(""); });
+  lista.appendChild(btnSin);
+
+  listaTecnicos.forEach(tec => {
+    const btn = document.createElement('button');
+    btn.className = 'tec-card';
+    const iniciales = tec.split(" ").map(p => p[0] || "").join("").toUpperCase().substring(0,2);
+    btn.innerHTML = `
+      <div class="tec-avatar" style="background:#e8f5e9; color:#2e7d32; font-size:15px; font-weight:900;">${iniciales}</div>
+      <div>
+        <div class="tec-nombre">${tec}</div>
+        <div class="tec-sub">Técnico de mantenimiento</div>
+      </div>
+    `;
+    // Usar data-attribute para evitar problemas de comillas en GAS
+    btn.setAttribute('data-tec', tec);
+    btn.addEventListener('click', function() {
+      seleccionarTecnico(this.getAttribute('data-tec'));
+    });
+    lista.appendChild(btn);
+  });
+}
+
+function seleccionarTecnico(nombre) {
+  tecnicoSeleccionado = nombre;
+  const btn = document.getElementById('btn-tecnico-sel');
+  const txt = document.getElementById('txt-tecnico-sel');
+  if (nombre) {
+    txt.textContent = "✅ " + nombre;
+    btn.classList.add('selected');
+  } else {
+    txt.textContent = "Toque para asignar técnico...";
+    btn.classList.remove('selected');
+  }
+  cerrarModalTecnicos();
+}
+
+function cerrarModalTecnicos() {
+  document.getElementById('modal-tecnicos').style.display = "none";
+}
+
+// ══════════════════════════
+//  PROCESAR ORDEN
+// ══════════════════════════
+function procesar(accion) {
+  if (accion === 'ACEPTAR' && !tecnicoSeleccionado) {
+    mostrarAlerta("⚠️ Debes asignar un técnico antes de aceptar.", "warning");
+    return;
+  }
+ 
+  const confirmar = confirm("¿Confirmar acción: " + accion + "?");
+  if (!confirmar) return;
+ 
+  // ── Marca de agua ──
+  const wm = document.getElementById('marcaAgua');
+  if (accion === 'ACEPTAR') {
+    wm.innerText         = 'INICIADO';
+    wm.style.color       = '#1565c0';
+    wm.style.borderColor = '#1565c0';
+  } else {
+    wm.innerText         = 'CANCELADO';
+    wm.style.color       = '#d32f2f';
+    wm.style.borderColor = '#d32f2f';
+  }
+  wm.style.display = 'block';
+ 
+  // ── Colores según prioridad ──
+  const prio = ((datos && datos.prioridad) || "MEDIA").toUpperCase();
+  const colores = {
+    "CRITICA":"#b71c1c", "CRÍTICA":"#b71c1c",
+    "ALTA":   "#ff9800",
+    "MEDIA":  "#fbc02d",
+    "BAJA":   "#03a9f4"
+  };
+  const bannerColor   = colores[prio] || "#1a237e";
+  const bannerTxtColor = (prio === "MEDIA" || prio === "BAJA") ? "#000" : "#fff";
+  const leyendas = {
+    "CRITICA":"PRIORIDAD CRÍTICA — ATENCIÓN INMEDIATA",
+    "CRÍTICA":"PRIORIDAD CRÍTICA — ATENCIÓN INMEDIATA",
+    "ALTA":   "PRIORIDAD ALTA — DAR PRIORIDAD",
+    "MEDIA":  "PRIORIDAD MEDIA — HACERLE UN ESPACIO",
+    "BAJA":   "PRIORIDAD BAJA — PROGRAMAR TRABAJO"
+  };
+ 
+  // Aplicar borde y banners
+  document.getElementById('ticket-render').style.border = "18px solid " + bannerColor;
+ 
+  const bt = document.getElementById('tr-banner-top');
+  bt.style.background = bannerColor;
+  bt.style.color      = bannerTxtColor;
+  bt.textContent      = leyendas[prio] || prio;
+ 
+  const bb = document.getElementById('tr-banner-bottom');
+  bb.style.background = bannerColor;
+  bb.style.color      = bannerTxtColor;
+  bb.textContent      = leyendas[prio] || prio;
+ 
+  // ── Rellenar campos dinámicos (técnico y fecha) ──
+  document.getElementById('tr-tecnico').textContent = tecnicoSeleccionado || "Sin asignar";
+  document.getElementById('tr-fecha').textContent   = new Date().toLocaleString('es-MX');
+ 
+  // ── Overlay de progreso ──
+  document.getElementById('loading-content').style.display = "block";
+  document.getElementById('success-content').style.display = "none";
+  document.getElementById('overlay').style.display         = "flex";
+  document.getElementById('p-box').style.display           = "block";
+  document.getElementById('msg').textContent               = "Procesando orden...";
+  document.getElementById('msg-sub').textContent           = "Por favor espere";
+ 
+  let p = 0;
+  const interval = setInterval(() => {
+    p++;
+    document.getElementById('bar').style.width = p + "%";
+    if (p === 40) document.getElementById('msg').textContent = "Actualizando hoja...";
+    if (p === 70) document.getElementById('msg').textContent = "Enviando notificación Telegram...";
+    if (p >= 100) {
+      clearInterval(interval);
+      html2canvas(document.getElementById('ticket-render'), {
+        scale: 2,
+        useCORS: true          // ← necesario para cargar la imagen de Drive
+      }).then(canvas => {
+        const usuario = document.getElementById('labelUsuario').textContent;
+        google.script.run
+          .withSuccessHandler(() => {
+            document.getElementById('loading-content').style.display = "none";
+            document.getElementById('success-content').style.display = "flex";
+          })
+          .withFailureHandler(err => {
+            document.getElementById('overlay').style.display = "none";
+            mostrarAlerta("❌ Error al procesar: " + err.message, "error");
+          })
+          .finalizarGestion(
+            {
+              fila:    datos.fila,
+              folio:   datos.folio,
+              accion:  accion,
+              user:    usuario,
+              tecnico: tecnicoSeleccionado,
+              msgId:   datos.msgId
+            },
+            canvas.toDataURL("image/png")
+          );
+      });
+    }
+  }, 70);
+}
+
+// ══════════════════════════
+//  CERRAR SESIÓN
+// ══════════════════════════
+function cerrarSesion() {
+  try {
+    localStorage.removeItem(SK_USER);
+    localStorage.removeItem(SK_PASS);
+  } catch(e) {}
+  document.getElementById('main-ui').style.display = "none";
+  document.getElementById('userInput').value = "";
+  document.getElementById('passInput').value = "";
+  document.getElementById('login-error').style.display = "none";
+  document.getElementById('login-screen').style.display = "flex";
+}
+
+// ══════════════════════════
+//  UTILIDADES
+// ══════════════════════════
+function mostrarAlerta(msg, tipo) {
+  // Alerta simple sin SweetAlert2
+  const colors = { warning: "#f57f17", error: "#d32f2f", info: "#1a237e" };
+  const div = document.createElement('div');
+  div.style.cssText = `
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:${colors[tipo] || '#333'}; color:white;
+    padding:14px 24px; border-radius:12px; font-weight:900;
+    font-size:14px; z-index:999999; max-width:90%; text-align:center;
+    box-shadow:0 4px 20px rgba(0,0,0,.3);
+  `;
+  div.textContent = msg;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 3500);
+}
+</script>
+</body>
+</html>

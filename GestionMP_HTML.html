@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    /* Animación de la palomita */
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+.success-checkmark {
+    font-size: 100px;
+    color: #28a745;
+    animation: bounce 2s infinite ease-in-out;
+}
+
+/* Estilo para el botón X de eliminar */
+.btn-delete { color: #dc3545; cursor: pointer; font-size: 1.1rem; transition: 0.2s; }
+.btn-delete:hover { color: #a71d2a; transform: scale(1.2); }
+
+/* Ajuste ComboBox Mes */
+.select-mes { width: 150px; display: inline-block; }
+
+/* Animación y Pantalla de Éxito - FIX para blanco */
+#pantallaExito {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: white;
+    display: none;
+    z-index: 10001;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.success-content {
+    display: flex;
+    align-items: center;
+    gap: 50px;
+    max-width: 900px;
+}
+
+.success-text-side { text-align: center; }
+
+/* Ajuste para inputs manuales */
+.td-input-manual {
+    background-color: #e3f2fd !important; /* Azul muy tenue para indicar que es editable manual */
+    border: 1px solid #90caf9 !important;
+}
+
+    /* Estilos heredados y personalizados */
+    #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:9999; }
+    .tool-container { width: 300px; height: 100px; }
+    .text-svg { font-size: 60px; font-weight: 900; text-anchor: middle; font-family: sans-serif; }
+    .liquid { animation: fill-anim 3s infinite ease-in-out; fill: #004a99; }
+    @keyframes fill-anim { 0%, 100% { transform: translateY(80px); } 50% { transform: translateY(-10px); } }
+    .clean-outline { fill: none; stroke: black; stroke-width: 2px; }
+
+    body { background-color: #f4f7f6; font-size: 0.85rem; }
+    .nav-tabs .nav-link { font-weight: bold; color: #555; cursor: pointer; }
+    .nav-tabs .nav-link.active { color: #004a99; border-bottom: 3px solid #004a99; }
+    
+    .table-container { max-height: 65vh; overflow-y: auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    table { width: 100%; border-collapse: collapse; }
+    thead { position: sticky; top: 0; background: #004a99; color: white; z-index: 10; }
+    th, td { padding: 8px; border: 1px solid #dee2e6; text-align: center; }
+
+    /* Estilos de Selección de Fila y Celda */
+    .row-selected { background-color: #fff9c4 !important; font-weight: bold; }
+    .cell-focus { background-color: #c8e6c9 !important; outline: 2px solid #2e7d32; }
+    .row-error { background-color: #ffcdd2 !important; }
+    .row-pending-exit { background-color: #fce4ec !important; }
+
+    input.td-input { width: 100%; border: none; background: transparent; text-align: center; outline: none; }
+    .sync-btn { position: fixed; top: 20px; right: 20px; z-index: 1000; display: none; }
+    
+    .search-bar { background: white; padding: 10px; border-bottom: 2px solid #ddd; }
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="tool-container">
+    <svg viewBox="0 0 450 140">
+      <defs><clipPath id="clip"><text x="225" y="100" class="text-svg">TOOL CN</text></clipPath></defs>
+      <rect x="0" y="0" width="450" height="140" class="liquid" clip-path="url(#clip)" />
+      <text x="225" y="100" class="text-svg clean-outline">TOOL CN</text>
+    </svg>
+  </div>
+  <p id="loaderText" class="fw-bold text-muted mt-3">PROCESANDO...</p>
+</div>
+
+<div class="search-bar d-flex align-items-center gap-2">
+    <div class="flex-grow-1">
+        <input type="text" id="globalSearch" class="form-control" placeholder="🔍 Buscar..." oninput="filtrarTablas()">
+    </div>
+    
+    <!-- Selector de Mes para Exportar -->
+    <select id="mesReporte" class="form-select select-mes">
+        <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
+        <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
+        <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
+        <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+    </select>
+    
+    <button class="btn btn-outline-success" onclick="generarReporteExcel()">
+        <i class="fas fa-file-download"></i> Exportar Reporte
+    </button>
+
+    <!-- Estos botones deben estar DENTRO de la barra o en un contenedor visible -->
+    <button id="btnSync" class="btn btn-primary sync-btn shadow" onclick="confirmarSincronizacion()">
+        <i class="fas fa-cloud-upload-alt"></i> SINCRONIZAR CON BASE DE DATOS
+    </button>
+    <button id="btnSaveSalidas" class="btn btn-danger sync-btn shadow" onclick="modalSalidasConfirm()">
+        <i class="fas fa-sign-out-alt"></i> GUARDAR <span id="countSalidas">0</span> CAMBIOS
+    </button>
+</div>
+
+<ul class="nav nav-tabs px-3 mt-2">
+  <li class="nav-item"><a class="nav-link active" id="tabEntradas" onclick="switchTab('entradas')">ENTRADAS MATERIA PRIMA</a></li>
+  <li class="nav-item"><a class="nav-link" id="tabSalidas" onclick="switchTab('salidas')">SALIDAS MATERIA PRIMA</a></li>
+  <li class="nav-item"><a class="nav-link" id="tabConsultas" onclick="switchTab('consultas')">CONSULTAS</a></li>
+</ul>
+
+<div class="container-fluid p-3">
+    <!-- PESTAÑA ENTRADAS -->
+    <div id="panelEntradas">
+        <div class="row mb-3 bg-white p-3 rounded shadow-sm">
+            <div class="col-md-3">
+                <label class="fw-bold">Proveedor:</label>
+                <input type="text" id="mainProveedor" class="form-control form-control-sm" value="TERNIUM" oninput="updateGlobalFields()">
+            </div>
+            <div class="col-md-3">
+                <label class="fw-bold">Fecha Entrada:</label>
+                <input type="date" id="mainFecha" class="form-control form-control-sm" onchange="updateGlobalFields()">
+            </div>
+            <div class="col-md-6 text-end align-self-end">
+                <button class="btn btn-outline-primary me-2" onclick="agregarFilaManual()">
+                   <i class="fas fa-plus"></i> Agregar Nuevo
+                </button>
+                <input type="file" id="excelFile" accept=".xlsx, .xls" class="d-none" onchange="handleExcel(this)">
+                <button class="btn btn-success" onclick="document.getElementById('excelFile').click()">
+                   <i class="fas fa-file-excel"></i> Subir Excel de Proveedor
+                </button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="tablaEntradas">
+                <thead>
+                    <tr>
+                        <th>PROVEEDOR</th><th>FECHA</th><th>DIÁMETRO</th><th>ACERO</th>
+                        <th>N_ROLLO</th><th>KILOS</th><th>COLADA</th><th>CONS.</th>
+                        <th>SELLO</th><th>N_REMISION</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyEntradas"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- PESTAÑA SALIDAS -->
+    <div id="panelSalidas" class="d-none">
+        <div class="row mb-3 bg-white p-3 rounded shadow-sm">
+            <div class="col-md-4">
+                <label class="fw-bold">Fecha de Salida General:</label>
+                <input type="date" id="fechaSalidaGral" class="form-control form-control-sm">
+            </div>
+        </div>
+        <div class="table-container">
+            <table id="tablaSalidas">
+                <thead>
+                    <tr>
+                        <th>PROVEEDOR</th><th>FECHA ENTRADA</th><th>DIÁMETRO</th><th>ACERO</th>
+                        <th>N_ROLLO</th><th>KILOS</th><th>COLADA</th><th>SELLO</th><th>ACCIÓN</th>
+                    </tr>
+                </thead>
+                <tbody id="bodySalidas"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+    <!-- PESTAÑA CONSULTAS -->
+    <div id="panelConsultas" class="d-none">
+    <div class="row mb-3 bg-white p-3 rounded shadow-sm align-items-end">
+        <div class="col-md-2">
+            <label class="fw-bold">Tipo:</label>
+            <select id="conTipo" class="form-select form-select-sm">
+                <option value="entradas">ENTRADAS</option>
+                <option value="salidas">SALIDAS</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="fw-bold">Fecha Inicial:</label>
+            <input type="date" id="conIni" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3">
+            <label class="fw-bold">Fecha Final:</label>
+            <input type="date" id="conFin" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary btn-sm w-100" onclick="ejecutarConsulta()">
+                <i class="fas fa-search"></i> Consultar
+            </button>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table id="tablaConsultas">
+            <thead id="headConsultas"></thead>
+            <tbody id="bodyConsultas"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL INDIVIDUAL SALIDA -->
+<div class="modal fade" id="modalSalidaInd" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h6 class="modal-title" id="salidaIndTitle"></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="salidaIndId">
+        <div class="mb-3">
+            <label class="form-label">Fecha de Salida:</label>
+            <input type="date" id="salidaIndFecha" class="form-control">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Comentarios:</label>
+            <textarea id="salidaIndComm" class="form-control" style="text-transform: uppercase;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary w-100" onclick="registrarCambioSalida()">Agregar a la lista</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMACION MASIVA -->
+<div class="modal fade" id="modalSalidaConfirm" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">Confirmar Salidas de Alambrón</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Se realizarán estas salidas de alambrón:</p>
+        <div id="listaConfirmSalidas" class="list-group"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" onclick="ejecutarSalidasFinal()">Aceptar y Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pantallaExito">
+  <div class="success-content">
+    <div class="success-text-side">
+      <div class="success-checkmark"><i class="fas fa-check-circle"></i></div>
+      <h1 class="fw-bold">Base de datos sincronizada</h1>
+      <div class="mt-4 d-flex gap-3 justify-content-center">
+        <button class="btn btn-secondary btn-lg" onclick="google.script.host.close()">Cerrar</button>
+        <button class="btn btn-primary btn-lg" onclick="recargarPagina()">Hacer otro movimiento</button>
+      </div>
+    </div>
+    <div>
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR9kSUngIDeVVklT1KOcB8Lm1UYAPHW136wIw&s" class="rounded shadow shadow-lg" style="width: 350px;">
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalFiltroCon" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-1">
+        <h6 id="titFiltroCon" class="mb-0 fw-bold"></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-2">
+        <input type="text" id="busFiltroCon" class="form-control form-control-sm mb-2" placeholder="Buscar..." oninput="filtrarChecksCon()">
+        <div class="d-flex justify-content-between mb-2 small">
+          <span class="text-primary cursor-pointer" onclick="toggleTodosCon(true)">Marcar todos</span>
+          <span class="text-primary cursor-pointer" onclick="toggleTodosCon(false)">Desmarcar</span>
+        </div>
+        <div id="listaChecksCon" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 5px;"></div>
+      </div>
+      <div class="modal-footer py-1">
+        <button class="btn btn-primary btn-sm w-100" onclick="aplicarFiltroCon()">Aplicar Filtro</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+
+<script>
+  let entradasData = [];
+  let salidasMaster = [];
+  let cambiosSalidas = {}; // Objeto para trackear cambios por ID
+  const loader = document.getElementById('loader');
+  const loaderText = document.getElementById('loaderText');
+
+  window.onload = () => {
+    const hoy = new Date();
+    const ayer = new Date();
+    ayer.setDate(hoy.getDate() - 1);
+    
+    const fechaHoyStr = hoy.toISOString().split('T')[0];
+    const fechaAyerStr = ayer.toISOString().split('T')[0];
+    
+    // Fechas Entradas/Salidas
+    document.getElementById('mainFecha').value = fechaAyerStr;
+    document.getElementById('fechaSalidaGral').value = fechaAyerStr;
+
+    // Fechas Consultas (Por default hoy)
+    if(document.getElementById('conIni')) document.getElementById('conIni').value = fechaHoyStr;
+    if(document.getElementById('conFin')) document.getElementById('conFin').value = fechaHoyStr;
+    
+    cargarExistenciaSalidas();
+  };
+
+  function switchTab(tab) {
+    // Paneles (Contenido)
+    document.getElementById('panelEntradas').classList.toggle('d-none', tab !== 'entradas');
+    document.getElementById('panelSalidas').classList.toggle('d-none', tab !== 'salidas');
+    document.getElementById('panelConsultas').classList.toggle('d-none', tab !== 'consultas'); // <--- FALTA ESTA LÍNEA
+    
+    // Botones (Pestañas)
+    document.getElementById('tabEntradas').classList.toggle('active', tab === 'entradas');
+    document.getElementById('tabSalidas').classList.toggle('active', tab === 'salidas');
+    document.getElementById('tabConsultas').classList.toggle('active', tab === 'consultas'); // <--- FALTA ESTA LÍNEA
+    
+    checkButtons();
+  }
+
+  function showLoader(txt) {
+    loaderText.innerText = txt;
+    loader.style.display = 'flex';
+  }
+
+  // --- LOGICA ENTRADAS (EXCEL) ---
+
+  function handleExcel(input) {
+    const file = input.files[0];
+    const reader = new FileReader();
+    showLoader("PROCESANDO EXCEL...");
+    
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, {type: 'array'});
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      
+      // Convertimos a array de arrays para manejar mejor los índices
+      const rows = XLSX.utils.sheet_to_json(sheet, {header: "A"});
+      
+      entradasData = [];
+      let consecutivoCounter = 1;
+
+      // Filtramos las filas:
+      // 1. Saltamos las primeras filas (encabezados suelen ser r.A == "N° Remisión")
+      // 2. Solo procesamos si r.A (Remisión) existe y r.AO (Colada) existe
+      rows.forEach((r) => {
+        // Validación: r.A debe ser el número de remisión. Si dice "N° Remisión" o está vacío, saltamos.
+        // Si AH (Toneladas) no es un número, saltamos (evita filas de texto al final).
+        if (!r.A || isNaN(r.A) || !r.AH || isNaN(r.AH)) return;
+
+        const diamRaw = String(r.Z || "");
+        const diametro = diamRaw.replace(/[^\d.]/g, '') || "0";
+        
+        const aceroRaw = String(r.T || "");
+        const acero = aceroRaw.replace(/Alambron\s*/gi, '').trim();
+
+        // Lógica para extraer N_ROLLO desde columna S (Nro. de serie)
+        const serieRaw = String(r.S || "").trim();
+        let nRolloExtraido = "";
+        if (serieRaw.length >= 2) {
+            let ultimosDos = serieRaw.slice(-2);
+            // Si el penúltimo es letra (ej: L3), toma solo el último (3). Si es número (ej: 03), toma ambos.
+            nRolloExtraido = /[a-zA-Z]/.test(ultimosDos[0]) ? ultimosDos[1] : ultimosDos;
+        } else {
+            nRolloExtraido = serieRaw;
+        }
+
+        entradasData.push({
+          proveedor: document.getElementById('mainProveedor').value,
+          fecha: document.getElementById('mainFecha').value,
+          diametro: diametro,
+          acero: acero,
+          n_rollo: nRolloExtraido,
+          kilos: Math.round((parseFloat(r.AH) || 0) * 1000),
+          colada: r.AO || '',
+          consecutivo: consecutivoCounter++,
+          sello: '',
+          n_remision: r.A || ''
+        });
+      });
+      
+      renderEntradas();
+      loader.style.display = 'none';
+      input.value = ""; 
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+  // FIX: Recarga sin pantalla blanca
+  function recargarPagina() {
+    const url = window.location.href.split('?')[0] + "?v=gestionmp&user=" + (new URLSearchParams(window.location.search).get('user') || 'USUARIO');
+    window.location.href = url;
+  }
+
+// Renderizado con Botón X
+function renderEntradas() {
+    const body = document.getElementById('bodyEntradas');
+    body.innerHTML = entradasData.map((r, i) => {
+      const editableAttr = r.esManual ? 'td-input-manual' : '';
+      return `
+        <tr data-row="${i}">
+          <td class="td-prov">${r.proveedor}</td>
+          <td class="td-fecha">${r.fecha.split("-").reverse().join("/")}</td>
+          <td><input type="text" class="td-input ${editableAttr}" value="${r.diametro}" oninput="syncInput(${i}, 'diametro', this)" ${!r.esManual ? 'readonly' : ''}></td>
+          <td><input type="text" class="td-input ${editableAttr}" value="${r.acero}" oninput="syncInput(${i}, 'acero', this)" ${!r.esManual ? 'readonly' : ''}></td>
+          <!-- COLUMNA N_ROLLO AÑADIDA -->
+          <td><input type="text" class="td-input ${editableAttr}" value="${r.n_rollo}" oninput="syncInput(${i}, 'n_rollo', this)" ${!r.esManual ? 'readonly' : ''}></td>
+          <td><input type="number" class="td-input ${editableAttr}" value="${r.kilos}" oninput="syncInput(${i}, 'kilos', this)" ${!r.esManual ? 'readonly' : ''}></td>
+          <td><input type="text" class="td-input ${editableAttr}" value="${r.colada}" oninput="syncInput(${i}, 'colada', this)" ${!r.esManual ? 'readonly' : ''}></td>
+          <td>${r.consecutivo}</td>
+          <td><input type="text" class="td-input sello" value="${r.sello}" oninput="syncInput(${i}, 'sello', this)"></td>
+          <td class="d-flex align-items-center justify-content-center gap-2">
+            <input type="text" class="td-input ${editableAttr}" 
+                   value="${r.n_remision}" 
+                   oninput="syncInput(${i}, 'n_remision', this)" 
+                   ${!r.esManual ? 'readonly' : ''}>
+            <i class="fas fa-times-circle btn-delete" onclick="eliminarFilaEntrada(${i})" title="Eliminar fila"></i>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    setupTableNavigation('tablaEntradas');
+    checkButtons();
+}
+
+function eliminarFilaEntrada(idx) {
+    if(confirm("¿Estás seguro de eliminar este registro de la lista?")) {
+        entradasData.splice(idx, 1);
+        renderEntradas();
+    }
+}
+
+  function syncInput(idx, field, el) {
+    entradasData[idx][field] = el.value;
+    checkButtons();
+  }
+
+  function updateGlobalFields() {
+    const p = document.getElementById('mainProveedor').value;
+    const f = document.getElementById('mainFecha').value;
+    document.querySelectorAll('.td-prov').forEach(td => td.innerText = p);
+    document.querySelectorAll('.td-fecha').forEach(td => td.innerText = f);
+    entradasData.forEach(r => { r.proveedor = p; r.fecha = f; });
+  }
+
+  function checkButtons() {
+    const panelEntradasVisible = !document.getElementById('panelEntradas').classList.contains('d-none');
+    const panelSalidasVisible = !document.getElementById('panelSalidas').classList.contains('d-none');
+
+    // Botón Entradas: Validamos que N_ROLLO y SELLO existan en todos.
+    // En manuales, además validamos Diámetro, Acero, Kilos y Remisión.
+    const incomplete = entradasData.some(r => {
+      const baseIncompleta = !r.n_rollo || !r.sello;
+      if (r.esManual) {
+        return baseIncompleta || !r.diametro || !r.acero || !r.kilos || !r.n_remision;
+      }
+      return baseIncompleta;
+    });
+    
+    document.getElementById('btnSync').style.display = (entradasData.length > 0 && !incomplete && panelEntradasVisible) ? 'block' : 'none';
+
+    // Botón Salidas
+    const numCambios = Object.keys(cambiosSalidas).length;
+    document.getElementById('btnSaveSalidas').style.display = (numCambios > 0 && panelSalidasVisible) ? 'block' : 'none';
+    document.getElementById('countSalidas').innerText = numCambios;
+  }
+
+  // --- NAVEGACION POR TECLADO ---
+  function setupTableNavigation(tableId) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    // 1. Manejo de Clic para seleccionar fila y celda
+    table.onclick = (e) => {
+        const row = e.target.closest('tr');
+        if (!row || row.parentElement.tagName === 'THEAD') return;
+        
+        highlightRow(row);
+        const input = e.target.closest('input');
+        if (input) {
+            highlightCell(input.parentElement);
+            input.select(); // Selecciona todo el contenido
+        }
+    };
+
+    // 2. Manejo de Teclado (Flechas)
+    table.onkeydown = (e) => {
+        const active = document.activeElement;
+        if (!active || active.tagName !== 'INPUT') return;
+
+        const currentCell = active.parentElement;
+        const currentRow = currentCell.parentElement;
+        const tbody = currentRow.parentElement;
+        
+        // Convertimos a array para buscar por índice real
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const cells = Array.from(currentRow.querySelectorAll('td'));
+        
+        const rowIndex = rows.indexOf(currentRow);
+        const colIndex = cells.indexOf(currentCell);
+
+        let targetRowIndex = rowIndex;
+        let targetColIndex = colIndex;
+
+        // Lógica de dirección
+        if (e.key === "ArrowDown") {
+            targetRowIndex = rowIndex + 1;
+            e.preventDefault();
+        } else if (e.key === "ArrowUp") {
+            targetRowIndex = rowIndex - 1;
+            e.preventDefault();
+        } else if (e.key === "ArrowRight" && active.selectionEnd === active.value.length) {
+            targetColIndex = colIndex + 1;
+        } else if (e.key === "ArrowLeft" && active.selectionStart === 0) {
+            targetColIndex = colIndex - 1;
+        }
+
+        // Si hay movimiento, buscamos la celda destino
+        if (targetRowIndex !== rowIndex || targetColIndex !== colIndex) {
+            const targetRow = rows[targetRowIndex];
+            if (targetRow) {
+                const targetCell = targetRow.children[targetColIndex];
+                if (targetCell) {
+                    const input = targetCell.querySelector('input');
+                    if (input && !input.readOnly) {
+                        input.focus();
+                        setTimeout(() => input.select(), 10); // Delay mínimo para asegurar selección total
+                        highlightRow(targetRow);
+                        highlightCell(targetCell);
+                        if (e.key === "ArrowDown" || e.key === "ArrowUp") e.preventDefault();
+                    } else if (input && input.readOnly) {
+                        // Si es de solo lectura (como los de excel), saltamos a la siguiente celda en la misma fila
+                        // o simplemente permitimos el foco pero sin edición.
+                        input.focus();
+                    }
+                }
+            }
+        }
+    };
+}
+
+  function highlightRow(row) {
+    document.querySelectorAll('.row-selected').forEach(r => r.classList.remove('row-selected'));
+    row.classList.add('row-selected');
+  }
+
+  function highlightCell(td) {
+    document.querySelectorAll('.cell-focus').forEach(c => c.classList.remove('cell-focus'));
+    td.classList.add('cell-focus');
+  }
+
+  // --- SINCRONIZACION ENTRADAS ---
+  function confirmarSincronizacion() {
+    // 1. Validar duplicados INTERNOS (en la misma tabla que acaba de subir el usuario)
+    const sellosEnTabla = entradasData.map(r => String(r.sello).trim().toUpperCase());
+    const duplicadosInternos = sellosEnTabla.filter((sello, index) => sellosEnTabla.indexOf(sello) !== index && sello !== "");
+    
+    if (duplicadosInternos.length > 0) {
+        alert("⚠️ Error: Tienes sellos repetidos dentro de tu misma lista: " + [...new Set(duplicadosInternos)].join(", "));
+        marcarDuplicados(duplicadosInternos);
+        return;
+    }
+
+    showLoader("VERIFICANDO SELLOS EN BASE DE DATOS...");
+    
+    // 2. Validar contra la BASE DE DATOS real en Google Sheets
+    google.script.run.withSuccessHandler(duplicadosBD => {
+        if (duplicadosBD.length > 0) {
+            loader.style.display = 'none'; // Detener loader para que el usuario corrija
+            alert("❌ BLOQUEADO: Los siguientes sellos YA EXISTEN en la base de datos y no se pueden repetir:\n\n" + duplicadosBD.join("\n"));
+            marcarDuplicados(duplicadosBD);
+        } else {
+            // SI NO HAY DUPLICADOS EN NINGÚN LADO, PROCEDER A GUARDAR
+            loaderText.innerText = "✅ SELLOS VALIDADOS CON ÉXITO";
+            
+            setTimeout(() => {
+                loaderText.innerText = "GUARDANDO DATOS EN SHEETS...";
+                
+                google.script.run.withSuccessHandler(() => {
+                    // Cambio crítico: En lugar de recargar, mostramos la pantalla de éxito final
+                    mostrarExito();
+                }).guardarEntradasMP(entradasData);
+                
+            }, 800);
+        }
+    }).verificarSellosDuplicados(sellosEnTabla);
+}
+
+// Función para marcar visualmente los errores
+function marcarDuplicados(listaNegra) {
+    const listaLimpia = listaNegra.map(s => String(s).trim().toUpperCase());
+    document.querySelectorAll('#bodyEntradas tr').forEach((tr, i) => {
+        const selloCelda = String(entradasData[i].sello).trim().toUpperCase();
+        if (listaLimpia.includes(selloCelda)) {
+            tr.style.backgroundColor = "#ffcdd2"; // Rojo claro
+            tr.style.color = "#b71c1c"; // Texto rojo oscuro
+            tr.querySelector('.sello').style.fontWeight = "bold";
+        } else {
+            tr.style.backgroundColor = "";
+            tr.style.color = "";
+        }
+    });
+}
+
+  // --- LOGICA SALIDAS ---
+
+  function cargarExistenciaSalidas() {
+    google.script.run.withSuccessHandler(data => {
+        salidasMaster = data.filter(r => r.tieneInsp || true); // Aquí podrías filtrar solo activos si getMateriaPrimaData no lo hace
+        renderSalidas();
+    }).getMateriaPrimaData();
+  }
+
+  function renderSalidas() {
+    const body = document.getElementById('bodySalidas');
+    body.innerHTML = salidasMaster.map(r => {
+        const enCambio = cambiosSalidas[r.id];
+        return `
+            <tr class="${enCambio ? 'row-pending-exit' : ''}" id="row-salida-${r.id}">
+                <td>${r.proveedor}</td><td>${r.fecha}</td><td>${r.diametro}</td><td>${r.aceroFull}</td>
+                <td>${r.n_rollo}</td><td>${r.kilos.toLocaleString()}</td><td>${r.colada}</td><td>${r.sello}</td>
+                <td>
+                    ${enCambio 
+                        ? `<button class="btn btn-warning btn-sm" onclick="deshacerSalida(${r.id})">Deshacer</button>`
+                        : `<button class="btn btn-primary btn-sm" onclick="abrirModalSalida(${r.id})">Seleccionar</button>`
+                    }
+                </td>
+            </tr>
+        `;
+    }).join('');
+  }
+
+  function abrirModalSalida(id) {
+    const item = salidasMaster.find(i => i.id == id);
+    document.getElementById('salidaIndTitle').innerHTML = `Has seleccionado el sello <b>${item.sello}</b><br><small>Alambrón Ø${item.diametro}mm Acero ${item.aceroFull}</small>`;
+    document.getElementById('salidaIndId').value = id;
+    document.getElementById('salidaIndFecha').value = document.getElementById('fechaSalidaGral').value;
+    document.getElementById('salidaIndComm').value = "";
+    new bootstrap.Modal(document.getElementById('modalSalidaInd')).show();
+  }
+
+  function registrarCambioSalida() {
+    const id = document.getElementById('salidaIndId').value;
+    const item = salidasMaster.find(i => i.id == id);
+    cambiosSalidas[id] = {
+        id: id,
+        sello: item.sello,
+        fechaSalida: document.getElementById('salidaIndFecha').value,
+        comentarios: document.getElementById('salidaIndComm').value
+    };
+    bootstrap.Modal.getInstance(document.getElementById('modalSalidaInd')).hide();
+    renderSalidas();
+    checkButtons();
+  }
+
+  function deshacerSalida(id) {
+    delete cambiosSalidas[id];
+    renderSalidas();
+    checkButtons();
+  }
+
+  function modalSalidasConfirm() {
+    const list = document.getElementById('listaConfirmSalidas');
+    list.innerHTML = Object.values(cambiosSalidas).map(c => `
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Sello: <b>${c.sello}</b> - Salida: ${c.fechaSalida}</span>
+            <button class="btn btn-outline-danger btn-sm" onclick="deshacerSalidaConfirm(${c.id})">Quitar</button>
+        </div>
+    `).join('');
+    new bootstrap.Modal(document.getElementById('modalSalidaConfirm')).show();
+  }
+
+  function deshacerSalidaConfirm(id) {
+    deshacerSalida(id);
+    modalSalidasConfirm();
+    if(Object.keys(cambiosSalidas).length === 0) bootstrap.Modal.getInstance(document.getElementById('modalSalidaConfirm')).hide();
+  }
+
+  function ejecutarSalidasFinal() {
+    showLoader("PROCESANDO SALIDAS...");
+    google.script.run.withSuccessHandler(() => {
+        mostrarExito(); // <-- AQUÍ TAMBIÉN
+    }).procesarSalidasMP(Object.values(cambiosSalidas));
+}
+
+  // --- FILTRO GLOBAL ---
+  function filtrarTablas() {
+    const val = document.getElementById('globalSearch').value.toLowerCase();
+    const panelEntradas = document.getElementById('panelEntradas');
+    const tableId = !panelEntradas.classList.contains('d-none') ? 'bodyEntradas' : 'bodySalidas';
+    
+    const container = document.getElementById(tableId);
+    if (!container) return; // <-- FIX: Evita el error si la tabla no existe aún
+
+    Array.from(container.querySelectorAll('tr')).forEach(tr => {
+        tr.style.display = tr.innerText.toLowerCase().includes(val) ? '' : 'none';
+    });
+}
+
+  function agregarFilaManual() {
+    // Validación: No dejar agregar si el anterior está incompleto
+    if (entradasData.length > 0) {
+      const u = entradasData[entradasData.length - 1];
+      if (!u.n_remision || !u.diametro || !u.acero || !u.kilos) {
+        alert("⚠️ Completa los datos técnicos antes de agregar otro renglón.");
+        return;
+      }
+    }
+
+    // Valores para heredar
+    let d = '', a = '', k = '', c = '', rem = '';
+    let nuevoRollo = 1;
+
+    if (entradasData.length > 0) {
+      const ultimo = entradasData[entradasData.length - 1];
+      d = ultimo.diametro;
+      a = ultimo.acero;
+      k = ultimo.kilos;
+      c = ultimo.colada;
+      rem = ultimo.n_remision;
+      
+      // Si el último era manual, seguimos su secuencia de rollo
+      if(ultimo.esManual) {
+        nuevoRollo = (parseInt(ultimo.n_rollo) || 0) + 1;
+      }
+    }
+
+    entradasData.push({
+      proveedor: document.getElementById('mainProveedor').value,
+      fecha: document.getElementById('mainFecha').value,
+      diametro: d,
+      acero: a,
+      n_rollo: nuevoRollo.toString(), // Autoincremento 1, 2, 3...
+      kilos: k,
+      colada: c,
+      consecutivo: entradasData.length + 1, // Autoincremento 1, 2, 3...
+      sello: '',
+      n_remision: rem,
+      esManual: true 
+    });
+    
+    renderEntradas();
+}
+
+  function mostrarExito() {
+    if (loader) loader.style.display = 'none';
+    const pantalla = document.getElementById('pantallaExito');
+    if (pantalla) {
+        pantalla.style.display = 'flex';
+    } else {
+        // Por si acaso el ID no existe, recargamos como plan B
+        location.reload();
+    }
+}
+
+async function generarReporteExcel() {
+    showLoader("CONFIGURANDO FORMATO AVANZADO Y COLORES...");
+    const mesIdx = parseInt(document.getElementById('mesReporte').value);
+    const anioActual = new Date().getFullYear();
+    const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    
+    google.script.run.withSuccessHandler(async (data) => {
+        if (!data || data.length === 0) {
+            loader.style.display = 'none';
+            alert("No hay datos para procesar.");
+            return;
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Inventario');
+        const diasMes = new Date(anioActual, mesIdx + 1, 0).getDate();
+
+        // 1. ANCHOS DE COLUMNA
+        worksheet.getColumn(1).width = 25; // Proveedor
+        worksheet.getColumn(2).width = 10; // Diametro
+        worksheet.getColumn(3).width = 12; // SAE
+
+        // 2. ENCABEZADO DE TÍTULO Y LOGO
+        worksheet.mergeCells('A1:C3');
+        const cellTitulo = worksheet.getCell('A1');
+        cellTitulo.value = "TOOL CN - INVENTARIO DE ALAMBRÓN " + mesesNombres[mesIdx].toUpperCase();
+        cellTitulo.font = { bold: true, size: 14, color: { argb: 'FF004a99' } };
+        cellTitulo.alignment = { vertical: 'middle', horizontal: 'center' };
+
+        // 3. COMBINACIONES VERTICALES DE ENCABEZADO BASE (Filas 4-6)
+        const headersBase = [
+            { col: 1, val: "Proveedor" },
+            { col: 2, val: "Ø" },
+            { col: 3, val: "SAE" }
+        ];
+        headersBase.forEach(h => {
+            worksheet.mergeCells(4, h.col, 6, h.col);
+            const cell = worksheet.getCell(4, h.col);
+            cell.value = h.val;
+            cell.font = { bold: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9ECEF' } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+
+        // 4. GENERAR DÍAS (Entradas/Salidas con Colores)
+        let colIdx = 4;
+        for (let d = 1; d <= diasMes; d++) {
+            const diaStr = `${mesesNombres[mesIdx].substring(0,3)} - ${d < 10 ? '0'+d : d}`;
+            
+            // Fila 4: Nombre del Día
+            worksheet.mergeCells(4, colIdx, 4, colIdx + 3);
+            const cellDia = worksheet.getCell(4, colIdx);
+            cellDia.value = diaStr;
+            cellDia.font = { bold: true };
+            cellDia.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F1' } };
+
+            // Fila 5: Entradas (Verde) / Salidas (Rojo)
+            worksheet.mergeCells(5, colIdx, 5, colIdx + 1);
+            const cellEnt = worksheet.getCell(5, colIdx);
+            cellEnt.value = "Entradas";
+            cellEnt.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } }; // Verde Claro
+            cellEnt.font = { color: { argb: 'FF006100' }, bold: true };
+
+            worksheet.mergeCells(5, colIdx + 2, 5, colIdx + 3);
+            const cellSal = worksheet.getCell(5, colIdx + 2);
+            cellSal.value = "Salidas";
+            cellSal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } }; // Rojo Claro
+            cellSal.font = { color: { argb: 'FF9C0006' }, bold: true };
+
+            // Fila 6: Rol / KGS
+            ["Rol.", "KGS", "Rol.", "KGS"].forEach((txt, i) => {
+                const cell = worksheet.getCell(6, colIdx + i);
+                cell.value = txt;
+                cell.font = { size: 8, bold: true };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i < 2 ? 'FFE2EFDA' : 'FFFCE4EC' } };
+            });
+
+            colIdx += 4;
+        }
+
+        // 5. ENCABEZADOS FINALES (Total Mes y Existencias Reales - AJUSTE MEGAFINO)
+        const colTotalMes = colIdx;
+        const totalCols = colTotalMes + 5;
+
+        // Fila 4: Título TOTAL MES (Gris/Azul tenue como los días)
+        worksheet.mergeCells(4, colTotalMes, 4, colTotalMes + 3);
+        const cellTotalMesH = worksheet.getCell(4, colTotalMes);
+        cellTotalMesH.value = "TOTAL MES";
+        cellTotalMesH.font = { bold: true };
+        cellTotalMesH.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F1' } };
+        cellTotalMesH.alignment = { vertical: 'middle', horizontal: 'center' };
+
+        // Fila 5: Entradas (Verde) / Salidas (Rojo)
+        worksheet.mergeCells(5, colTotalMes, 5, colTotalMes + 1);
+        const cellEntTotal = worksheet.getCell(5, colTotalMes);
+        cellEntTotal.value = "Entradas";
+        cellEntTotal.font = { bold: true, color: { argb: 'FF006100' } }; // Texto Verde Oscuro
+        cellEntTotal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } }; // Fondo Verde Claro
+
+        worksheet.mergeCells(5, colTotalMes + 2, 5, colTotalMes + 3);
+        const cellSalTotal = worksheet.getCell(5, colTotalMes + 2);
+        cellSalTotal.value = "Salidas";
+        cellSalTotal.font = { bold: true, color: { argb: 'FF9C0006' } }; // Texto Rojo Oscuro
+        cellSalTotal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } }; // Fondo Rojo Claro
+
+        // Fila 6: Rol. / KGS con rellenos tenues y negritas
+        ["Rol.", "KGS", "Rol.", "KGS"].forEach((txt, i) => {
+            const cell = worksheet.getCell(6, colTotalMes + i);
+            cell.value = txt;
+            cell.font = { size: 8, bold: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i < 2 ? 'FFE2EFDA' : 'FFFCE4EC' } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+
+        // EXISTENCIA ACTUAL (Combinada Vertical y Amarillo)
+        worksheet.mergeCells(4, colTotalMes + 4, 6, colTotalMes + 5);
+        const cellExisH = worksheet.getCell(4, colTotalMes + 4);
+        cellExisH.value = "EXISTENCIA ACTUAL";
+        cellExisH.font = { bold: true };
+        cellExisH.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // Amarillo
+        cellExisH.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+        // 6. PROCESAMIENTO DE DATOS (Filtro Año Actual + Ordenamiento)
+        const grupos = {};
+
+        data.forEach(r => {
+            const prov = String(r.proveedor || "").trim();
+            const diam = String(r.diametro || "").trim();
+            const acer = String(r.acero || "").trim();
+            const est  = String(r.estado || "").trim().toUpperCase();
+            
+            const key = `${prov}|${diam}|${acer}`;
+            
+            if (!grupos[key]) {
+                grupos[key] = { prov: prov, d: diam, a: acer, dias: {}, exR: 0, exK: 0 };
+            }
+            
+            // --- EXISTENCIA REAL (Acumulado global de ACTIVO) ---
+            if (est === "ACTIVO") {
+                grupos[key].exR += 1;
+                grupos[key].exK += parseFloat(r.kilos) || 0;
+            }
+
+            // --- MOVIMIENTOS DEL MES (Solo Año Actual) ---
+            const parsearFecha = (fechaStr) => {
+                if (!fechaStr) return null;
+                const p = fechaStr.split("/"); // [dd, mm, yyyy]
+                if (p.length !== 3) return null;
+                return {
+                    dia: parseInt(p[0]),
+                    mes: parseInt(p[1]) - 1,
+                    anio: parseInt(p[2])
+                };
+            };
+
+            // Validar Entrada
+            const fE = parsearFecha(r.fechaEntrada);
+            if (fE && fE.mes === mesIdx && fE.anio === anioActual) {
+                if (!grupos[key].dias[fE.dia]) grupos[key].dias[fE.dia] = { eR: 0, eK: 0, sR: 0, sK: 0 };
+                grupos[key].dias[fE.dia].eR++;
+                grupos[key].dias[fE.dia].eK += parseFloat(r.kilos) || 0;
+            }
+
+            // Validar Salida
+            const fS = parsearFecha(r.fechaSalida);
+            if (fS && fS.mes === mesIdx && fS.anio === anioActual && est === "BAJA") {
+                if (!grupos[key].dias[fS.dia]) grupos[key].dias[fS.dia] = { eR: 0, eK: 0, sR: 0, sK: 0 };
+                grupos[key].dias[fS.dia].sR++;
+                grupos[key].dias[fS.dia].sK += parseFloat(r.kilosSalida) || 0;
+            }
+        });
+
+        // --- ORDENAMIENTO ---
+        const listaOrdenada = Object.values(grupos).sort((a, b) => {
+            const diffDiam = parseFloat(a.d) - parseFloat(b.d);
+            if (diffDiam !== 0) return diffDiam;
+            return String(a.a).localeCompare(String(b.a), undefined, { numeric: true });
+        });
+
+        // 7. LLENADO DE FILAS DE DATOS (Asegurando el incremento)
+        let currentRowIdx = 7;
+        listaOrdenada.forEach(g => {
+            const row = worksheet.getRow(currentRowIdx);
+            row.getCell(1).value = g.prov;
+            row.getCell(2).value = parseFloat(g.d) || g.d;
+            row.getCell(3).value = g.a;
+
+            let tER = 0, tEK = 0, tSR = 0, tSK = 0;
+            let cIdx = 4;
+            for (let d = 1; d <= diasMes; d++) {
+                const info = g.dias[d] || {eR:0, eK:0, sR:0, sK:0};
+                if(info.eR > 0) row.getCell(cIdx).value = info.eR;
+                if(info.eK > 0) row.getCell(cIdx + 1).value = info.eK;
+                if(info.sR > 0) row.getCell(cIdx + 2).value = info.sR;
+                if(info.sK > 0) row.getCell(cIdx + 3).value = info.sK;
+                
+                tER += info.eR; tEK += info.eK; tSR += info.sR; tSK += info.sK;
+                cIdx += 4;
+            }
+            // Totales mes y Existencia Real
+            row.getCell(cIdx).value = tER; 
+            row.getCell(cIdx + 1).value = tEK;
+            row.getCell(cIdx + 2).value = tSR; 
+            row.getCell(cIdx + 3).value = tSK;
+            row.getCell(cIdx + 4).value = g.exR; 
+            row.getCell(cIdx + 5).value = g.exK;
+            
+            currentRowIdx++; // <--- Esto hace que la siguiente fila sea la de totales
+        });
+
+        // 8. FILA DE TOTALES (Fórmulas y Negritas Reales)
+        const rowTotales = worksheet.getRow(currentRowIdx);
+
+        // Combinamos las 3 primeras celdas para el título "TOTALES:"
+        worksheet.mergeCells(currentRowIdx, 1, currentRowIdx, 3);
+        const cellTituloTotales = rowTotales.getCell(1);
+        cellTituloTotales.value = "TOTALES:";
+        cellTituloTotales.font = { bold: true, size: 11 };
+        cellTituloTotales.alignment = { horizontal: 'center', vertical: 'middle' };
+        cellTituloTotales.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } }; // Gris claro
+
+        // Calcular totales por columna (desde columna 4 en adelante)
+        for (let c = 1; c <= totalCols; c++) {
+            const cell = rowTotales.getCell(c);
+            cell.font = { bold: true, size: 10 };
+    
+           // Solo calculamos desde la columna 4 en adelante (datos numéricos)
+           if (c >= 4) {
+               const colLetter = worksheet.getColumn(c).letter;
+        
+               // IMPORTANTE: Calculamos la suma directa, no con fórmula
+               let suma = 0;
+               for (let r = 7; r < currentRowIdx; r++) {
+                   const valorCelda = worksheet.getCell(r, c).value;
+                   suma += parseFloat(valorCelda) || 0;
+               }
+        
+                // Asignamos el valor calculado
+               cell.value = suma > 0 ? suma : 0;
+        
+               // Formato de miles para columnas de Kilos (impares: 5, 7, 9...)
+                cell.numFmt = (c % 2 === 1) ? '#,##0' : '0';
+            }
+    
+           // Bordes para la fila de totales (piso de la tabla)
+           cell.border = {
+                top: { style: 'medium' }, 
+                left: { style: 'thin' },
+               bottom: { style: 'medium' }, 
+               right: { style: 'thin' }
+           };
+    
+           // Fondo gris claro para toda la fila de totales
+           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
+    
+           // Alineación central
+           cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
+
+        // 9. REGLAS DE ESTILO FINALES (Bordes y Formato de Kilos)
+        for (let r = 4; r <= currentRowIdx; r++) {
+            const row = worksheet.getRow(r);
+            for (let c = 1; c <= totalCols; c++) {
+                const cell = row.getCell(c);
+                
+                // Alineación central para todo
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                // Borde base (si no es la fila de totales que ya tiene bordes específicos)
+                if (r < currentRowIdx) {
+                    cell.border = {
+                        top: { style: 'thin' }, left: { style: 'thin' },
+                        bottom: { style: 'thin' }, right: { style: 'thin' }
+                    };
+                }
+
+                // Formato de miles 0,000 para Kilos (Columnas impares: 5, 7, 9...)
+                if (c >= 4 && c % 2 === 1) {
+                    cell.numFmt = '#,##0';
+                }
+
+                // Separador grueso vertical entre cada día
+                if (c >= 7 && (c - 3) % 4 === 0 && c < colTotalMes) {
+                    cell.border.right = { style: 'medium' };
+                }
+            }
+        }
+
+        // 10. GENERACIÓN DEL ARCHIVO
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Reporte_Alambron_${mesesNombres[mesIdx].toUpperCase()}.xlsx`;
+        a.click();
+        loader.style.display = 'none';
+
+    }).getDatosReporteMensual(mesIdx, anioActual);
+}
+
+let dataConMaster = [];
+let filtrosCon = {};
+let colFiltroActual = '';
+
+// Al cargar, poner fechas por default
+const originalOnload = window.onload;
+window.onload = () => {
+    if(originalOnload) originalOnload();
+    const hoy = new Date().toISOString().split('T')[0];
+    document.getElementById('conIni').value = hoy;
+    document.getElementById('conFin').value = hoy;
+};
+
+function ejecutarConsulta() {
+    const tipo = document.getElementById('conTipo').value;
+    const ini = document.getElementById('conIni').value;
+    const fin = document.getElementById('conFin').value;
+    
+    if (!ini || !fin) {
+        alert("⚠️ Selecciona ambas fechas para consultar.");
+        return;
+    }
+
+    showLoader("BUSCANDO REGISTROS...");
+    
+    google.script.run.withSuccessHandler(data => {
+        // VALIDACIÓN QUIRÚRGICA: Si data es null o vacío
+        if (!data || data.length === 0) {
+            dataConMaster = [];
+            resetFiltrosCon();
+            renderConsultas();
+            loader.style.display = 'none';
+            alert("ℹ️ No se encontraron registros en ese rango de fechas.");
+            return;
+        }
+
+        // Si hay datos, ordenamos
+        dataConMaster = data.sort((a,b) => {
+        // Si consultamos salidas, ordenamos por fecha_salida, si no, por fecha
+        const fAStr = (tipo === 'entradas' ? a.fecha : a.fecha_salida) || "01/01/2000";
+        const fBStr = (tipo === 'entradas' ? b.fecha : b.fecha_salida) || "01/01/2000";
+        return parseFecha(fAStr) - parseFecha(fBStr);
+        });
+
+        resetFiltrosCon();
+        renderConsultas();
+        loader.style.display = 'none';
+    })
+    .withFailureHandler(err => {
+        loader.style.display = 'none';
+        alert("❌ Error crítico del servidor: " + err.message);
+    })
+    .getConsultasMP(tipo, ini, fin);
+}
+
+function parseFecha(fStr) {
+    if(!fStr) return new Date(0);
+    const p = fStr.split("/");
+    return new Date(p[2], p[1]-1, p[0]);
+}
+
+function resetFiltrosCon() {
+    filtrosCon = {};
+    if(dataConMaster.length > 0) {
+        Object.keys(dataConMaster[0]).forEach(k => {
+            filtrosCon[k] = [...new Set(dataConMaster.map(item => String(item[k])))];
+        });
+    }
+}
+
+function renderConsultas() {
+    const dataFiltrada = dataConMaster.filter(item => {
+        return Object.keys(filtrosCon).every(k => filtrosCon[k].includes(String(item[k])));
+    });
+
+    const head = document.getElementById('headConsultas');
+    const body = document.getElementById('bodyConsultas');
+    
+    const columnas = [
+        {k:'proveedor', l:'PROVEEDOR'}, {k:'fecha', l:'FECHA'}, {k:'diametro', l:'DIAM'}, 
+        {k:'acero', l:'ACERO'}, {k:'n_rollo', l:'ROLLO'}, {k:'kilos', l:'KILOS'}, 
+        {k:'colada', l:'COLADA'}, {k:'sello', l:'SELLO'}, {k:'n_remision', l:'REMISION'}, 
+        {k:'consecutivo', l:'CONS'}, {k:'estado', l:'ESTADO'}, {k:'fecha_salida', l:'F_SALIDA'}, 
+        {k:'kilos_salida', l:'K_SALIDA'}, {k:'comentarios', l:'COMENTARIOS'}
+    ];
+
+    head.innerHTML = `<tr>${columnas.map(c => `<th onclick="abrirFiltroCon('${c.k}')" class="cursor-pointer">${c.l} <i class="fas fa-filter small"></i></th>`).join('')}</tr>`;
+    
+    body.innerHTML = dataFiltrada.map(r => `
+        <tr>
+            <td>${r.proveedor}</td><td>${r.fecha}</td><td>${r.diametro}</td><td>${r.acero}</td>
+            <td>${r.n_rollo}</td><td>${r.kilos}</td><td>${r.colada}</td><td>${r.sello}</td>
+            <td>${r.n_remision}</td><td>${r.consecutivo}</td>
+            <td>
+                <button class="btn btn-sm ${r.estado === 'ACTIVO' ? 'btn-success' : 'btn-danger'}" onclick="switchEstadoCon(${r.id}, '${r.estado}', ${r.kilos})">
+                    ${r.estado}
+                </button>
+            </td>
+            <td>${r.fecha_salida || '-'}</td><td>${r.kilos_salida || '-'}</td><td>${r.comentarios || '-'}</td>
+        </tr>
+    `).join('');
+}
+
+function abrirFiltroCon(col) {
+    colFiltroActual = col;
+    // Filtro combinado: opciones basadas en lo que NO sea este filtro
+    const dataSub = dataConMaster.filter(i => {
+      return Object.keys(filtrosCon).every(k => k === col || filtrosCon[k].includes(String(i[k])));
+    });
+    
+    const opciones = [...new Set(dataSub.map(i => String(i[col])))].sort();
+    
+    document.getElementById('titFiltroCon').innerText = `Filtrar ${col.toUpperCase()}`;
+    document.getElementById('listaChecksCon').innerHTML = opciones.map(opt => `
+      <div class="form-check">
+        <input class="form-check-input check-con" type="checkbox" value="${opt}" ${filtrosCon[col].includes(opt) ? 'checked' : ''}>
+        <label class="form-check-label small">${opt}</label>
+      </div>
+    `).join('');
+    new bootstrap.Modal(document.getElementById('modalFiltroCon')).show();
+}
+
+function aplicarFiltroCon() {
+    filtrosCon[colFiltroActual] = Array.from(document.querySelectorAll('.check-con:checked')).map(cb => cb.value);
+    renderConsultas();
+    bootstrap.Modal.getInstance(document.getElementById('modalFiltroCon')).hide();
+}
+
+function switchEstadoCon(id, estadoActual, kilos) {
+    if (estadoActual === 'BAJA') {
+        if(confirm(`¿Cambiar Sello a ACTIVO? Se borrarán datos de salida.`)) {
+            procesarCambioEstado(id, 'ACTIVO', {});
+        }
+    } else {
+        const fSal = prompt("Ingrese FECHA DE SALIDA (DD/MM/YYYY):", document.getElementById('conFin').value.split('-').reverse().join('/'));
+        if (!fSal) return;
+        const comm = prompt("Comentarios (Opcional):", "");
+        procesarCambioEstado(id, 'BAJA', { fecha: fSal, kilos: kilos, comentarios: comm || "" });
+    }
+}
+
+function procesarCambioEstado(id, nuevo, info) {
+    showLoader("ACTUALIZANDO ESTADO...");
+    google.script.run.withSuccessHandler(res => {
+        if(res) ejecutarConsulta();
+        else { alert("Error al actualizar"); loader.style.display = 'none'; }
+    }).actualizarEstadoMP(id, nuevo, info);
+}
+
+// Helpers para el modal de filtros
+function filtrarChecksCon() {
+    const val = document.getElementById('busFiltroCon').value.toLowerCase();
+    document.querySelectorAll('#listaChecksCon .form-check').forEach(el => el.style.display = el.innerText.toLowerCase().includes(val) ? '' : 'none');
+}
+function toggleTodosCon(v) {
+    document.querySelectorAll('.check-con').forEach(cb => { if(cb.parentElement.style.display !== 'none') cb.checked = v; });
+}
+</script>
+</body>
+</html>

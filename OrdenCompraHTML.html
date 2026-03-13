@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
+    
+    /* CONFIGURACIÓN DE PÁGINA */
+    html, body { margin: 0; padding: 0; background: #f0f0f0; font-family: 'Roboto', sans-serif; }
+
+    #print-area {
+      width: 215.9mm;
+      min-height: 279.4mm; /* Tamaño Carta */
+      margin: 20px auto;
+      background: white;
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      position: relative;
+    }
+
+    @media print {
+      body { background: none; }
+      #print-area { margin: 0; box-shadow: none; padding: 10mm; width: 100%; height: 279.4mm; }
+      #loader { display: none !important; }
+      @page { size: letter; margin: 0; }
+    }
+
+    /* --- LOGO NUCLEAR ORIGINAL --- */
+    #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; }
+    .tool-container { width: 450px; height: 140px; }
+    .text-svg { font-size: 100px; font-weight: 900; text-anchor: middle; }
+    .liquid { animation: fill-anim 3s infinite ease-in-out; }
+    @keyframes fill-anim { 0%, 100% { transform: translateY(120px); } 50% { transform: translateY(0px); } }
+    .clean-outline { filter: drop-shadow(2px 0px 0px black) drop-shadow(-2px 0px 0px black) drop-shadow(0px 2px 0px black) drop-shadow(0px -2px 0px black); }
+
+    /* MARCA DE AGUA */
+    .watermark {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 80px; font-weight: 900; color: rgba(211, 47, 47, 0.1);
+      border: 8px solid rgba(211, 47, 47, 0.1); padding: 10px 20px;
+      text-transform: uppercase; z-index: 1000; display: none; pointer-events: none;
+    }
+
+    /* CABECERA */
+    .header-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    .header-table td { border: 1px solid #000; vertical-align: top; padding: 10px; }
+    .info-empresa { font-size: 10px; line-height: 1.3; }
+
+    .folio-table { width: 100%; border-collapse: collapse; }
+    .folio-table td { border: 1px solid #000; padding: 5px; font-size: 11px; }
+    .bg-gray { background: #f2f2f2; font-weight: 900; text-align: center; }
+
+    /* SECCIÓN PROVEEDOR */
+    .prov-section { 
+      border: 1px solid #000; 
+      padding: 10px; 
+      font-size: 11px; 
+      display: grid; 
+      grid-template-columns: 1.5fr 1fr; 
+      gap: 5px; 
+      margin-bottom: 10px;
+    }
+    .prov-title { font-weight: 900; border-bottom: 1px solid #000; grid-column: span 2; margin-bottom: 5px; font-size: 13px; }
+
+    /* TABLA DE PRODUCTOS */
+    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    .items-table th { border: 1px solid #000; background: #f2f2f2; padding: 8px; font-size: 11px; font-weight: 900; }
+    .items-table td { border: 1px solid #000; padding: 8px; font-size: 11px; text-transform: uppercase; }
+
+    /* SECCIÓN INFERIOR (LEGAL + TOTALES) */
+    .footer-flex { display: flex; gap: 10px; align-items: flex-start; }
+    .legal-box { 
+      flex: 1; 
+      border: 1px solid #000; 
+      font-size: 7.5px; 
+      padding: 8px; 
+      text-align: justify; 
+      line-height: 1.4; 
+    }
+    .totals-table { width: 250px; border-collapse: collapse; }
+    .totals-table td { border: 1px solid #000; padding: 8px; font-size: 13px; font-weight: 900; text-align: right; }
+
+    /* ESPACIADOR: Empuja las firmas al fondo */
+    .flex-spacer { flex-grow: 1; }
+
+    /* FIRMAS */
+    .sigs-area { margin-top: 20px; padding-bottom: 10mm; }
+    .sigs-container { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 100px; 
+      padding: 0 50px; 
+      text-align: center;
+    }
+    .sig-box { border-top: 1.5px solid #000; padding-top: 5px; font-size: 12px; font-weight: 900; }
+
+  </style>
+</head>
+<body>
+
+<!-- LOADER NUCLEAR ORIGINAL -->
+<div id="loader">
+  <div class="tool-container">
+    <svg viewBox="0 0 500 150">
+      <defs><mask id="mask-text"><text x="250" y="110" fill="white" class="text-svg">TOOL CN</text></mask></defs>
+      <g class="clean-outline">
+        <text x="250" y="110" fill="white" class="text-svg">TOOL CN</text>
+        <g mask="url(#mask-text)"><rect class="liquid" x="0" y="0" width="500" height="150" fill="#FFFF00" /></g>
+      </g>
+    </svg>
+  </div>
+  <h2 id="loader-msg" style="color:#1a237e; font-weight: 900;">CARGANDO DOCUMENTO...</h2>
+</div>
+
+<div id="print-area">
+  <div id="watermark" class="watermark">CANCELADA</div>
+
+  <!-- CABECERA -->
+  <table class="header-table">
+    <tr>
+      <td width="60%">
+        <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" width="160" style="margin-bottom:10px;"><br>
+        <div class="info-empresa">
+          <b>CLAVOS NACIONALES CN S.A. DE C.V.</b><br>
+          PLANTA QUERÉTARO. CP 76269<br>
+          CAMINO A LA PURISIMA - EL POZO, NUMERO 5000, COMUNIDAD DEL POZO,<br>
+          MUNICIPIO DEL MARQUES, QUERETARO. CP 76269
+        </div>
+      </td>
+      <td width="40%" style="padding: 0;">
+        <table class="folio-table">
+          <tr><td colspan="2" class="bg-gray">ORDEN DE COMPRA</td></tr>
+          <tr><td width="40%"><b>FOLIO:</b></td><td align="right" style="color:red; font-size:18px; font-weight:900;" id="p-folio"></td></tr>
+          <tr><td><b>Fecha:</b></td><td align="right" id="p-fecha"></td></tr>
+          <tr><td><b>Autorizado por:</b></td><td align="right"><b>ROBERTO DIAZ</b></td></tr>
+          <tr><td><b>At'n:</b></td><td align="right" id="p-prov-contacto"></td></tr>
+          <tr><td><b>Email:</b></td><td align="right" id="p-prov-email" style="font-size:9px;"></td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- PROVEEDOR -->
+  <div class="prov-section">
+    <div class="prov-title">PROVEEDOR: <span id="p-prov-nom"></span></div>
+    <div><b>TELEFONO:</b> <span id="p-prov-tel"></span></div>
+    <div><b>CONDICION:</b> <span id="p-prov-cond"></span></div>
+    <div><b>DIAS CREDITO:</b> <span id="p-prov-cred"></span></div>
+    <div><b>SOLICITA:</b> Paty Torres</div>
+  </div>
+
+  <!-- PRODUCTOS -->
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th width="40">P</th>
+        <th>DESCRIPCION</th>
+        <th width="80">CANT</th>
+        <th width="80">UM</th>
+        <th width="110">C. UNIT.</th>
+        <th width="130">TOTAL MN</th>
+      </tr>
+    </thead>
+    <tbody id="p-body"></tbody>
+  </table>
+
+  <!-- LEGAL Y TOTALES (ALINEADOS) -->
+  <div class="footer-flex">
+    <div class="legal-box">
+      1. LA MERCANCIA DEBERA SER ENTREGADA CON DOCUMENTOS: a) COPIA OC; b) FACTURA O REMISION FIRMADA; c) CERTIFICADO CALIDAD.<br>
+      2. CITAR NUMERO OC EN TODOS LOS PAQUETES Y EMBARQUES. 3. NOS RESERVAMOS EL DERECHO DE CANCELAR.<br>
+      4. NO SE PAGARAN CARGOS EXTRA NO ACORDADOS. 5. REVISION DE PRECIOS CON 30 DIAS DE ANTICIPACION.
+    </div>
+    <table class="totals-table">
+      <tr><td style="background:#f2f2f2;">SUBTOTAL:</td><td id="p-sub"></td></tr>
+      <tr><td style="background:#f2f2f2;">IVA:</td><td id="p-iva"></td></tr>
+      <tr style="background:#e6e6e6;"><td>TOTAL:</td><td id="p-tot" style="font-size:16px;"></td></tr>
+    </table>
+  </div>
+
+  <!-- ESPACIADOR -->
+  <div class="flex-spacer"></div>
+
+  <!-- FIRMAS AL FONDO -->
+  <div class="sigs-area">
+    <div class="sigs-container">
+      <div class="sig-box">Roberto Díaz<br><small>Director de Planta</small></div>
+      <div class="sig-box">Paty Torres<br><small>Realizó y Vo. Bo.</small></div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.onload = () => {
+  const folio = "<?!= folio_inyectado ?>";
+  if(!folio) {
+    document.getElementById('loader-msg').innerHTML = "<span style='color:red'>ERROR: SIN FOLIO</span>";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(res => {
+      if(!res || res.error) {
+        document.getElementById('loader-msg').innerHTML = "<span style='color:red'>ERROR AL CARGAR DATOS</span>";
+        return;
+      }
+      
+      const c = res.cabecera;
+      if (c.estado === "CANCELADA") document.getElementById('watermark').style.display = 'block';
+
+      document.getElementById('p-folio').innerText = c.folio;
+      document.getElementById('p-fecha').innerText = c.fecha;
+      document.getElementById('p-prov-nom').innerText = c.proveedorNom;
+      document.getElementById('p-prov-contacto').innerText = c.prov.contacto || "";
+      document.getElementById('p-prov-email').innerText = c.prov.email || "";
+      document.getElementById('p-prov-tel').innerText = c.prov.tel || "";
+      document.getElementById('p-prov-cond').innerText = c.prov.condicion || "";
+      document.getElementById('p-prov-cred').innerText = c.prov.credito || "";
+
+      const fmt = (v) => {
+        let n = parseFloat(String(v).replace(/[$,]/g, '')) || 0;
+        return "$ " + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      };
+
+      document.getElementById('p-sub').innerText = fmt(c.subtotal);
+      document.getElementById('p-iva').innerText = fmt(c.iva);
+      document.getElementById('p-tot').innerText = fmt(c.total);
+
+      let h = "";
+      res.partidas.forEach((p, i) => {
+        h += `<tr><td align="center">${i+1}</td><td>${p.desc}</td><td align="center">${p.cant}</td><td align="center">${p.uni}</td><td align="right">${fmt(p.precio)}</td><td align="right">${fmt(p.total)}</td></tr>`;
+      });
+      document.getElementById('p-body').innerHTML = h;
+
+      document.getElementById('loader').style.display = 'none';
+      setTimeout(() => { window.print(); }, 800);
+    })
+    .withFailureHandler(err => {
+       document.getElementById('loader-msg').innerHTML = "ERROR DE CONEXIÓN";
+    })
+    .obtenerInformacionParaImprimirOC(folio);
+};
+</script>
+</body>
+</html>

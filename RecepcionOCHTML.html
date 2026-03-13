@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root { 
+      --primary: #1a237e; --bg: #f4f7f6; --success: #2e7d32; 
+      --danger: #d32f2f; --warning: #fbc02d; --green-active: #c8e6c9;
+      --vibrant-yellow: #FFFF00; 
+    }
+    body { font-family: 'Roboto', sans-serif; background: var(--bg); margin: 0; padding: 10px; overflow-x: hidden; }
+
+    /* --- LOGO NUCLEAR --- */
+    #overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #ffffff; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .tool-container { width: 450px; height: 140px; }
+    .text-svg { font-size: 100px; font-weight: 900; text-anchor: middle; }
+    .liquid { animation: fill-anim 3s infinite ease-in-out; }
+    @keyframes fill-anim { 0%, 100% { transform: translateY(120px); } 50% { transform: translateY(0px); } }
+    .clean-outline { filter: drop-shadow(2px 0px 0px black) drop-shadow(-2px 0px 0px black) drop-shadow(0px 2px 0px black) drop-shadow(0px -2px 0px black); }
+
+    /* --- TABLA --- */
+    .filter-bar { background: var(--primary); padding: 12px 20px; border-radius: 15px 15px 0 0; display: flex; gap: 15px; align-items: center; }
+    .search-input { flex: 1; padding: 12px; border-radius: 8px; border: none; outline: none; font-weight: bold; }
+    .container { background: white; border-radius: 0 0 15px 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); overflow: hidden; }
+    
+    table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+    th { background: #f0f0f0; padding: 10px 5px; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; font-weight: 900; }
+    td { border: 1px solid #eee; padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 45px; }
+
+    .col-oc { width: 80px; } .col-fec { width: 85px; } .col-pro { width: 150px; } 
+    .col-fol { width: 75px; } .col-can { width: 50px; } .col-des { width: 350px; } 
+    .col-rec { width: 85px; }
+
+    .row-active { background-color: var(--green-active) !important; box-shadow: inset 0 0 0 2px var(--primary); }
+    .row-modified { background-color: #fff9c4 !important; }
+    .row-parcial { background-color: #fffde7 !important; }
+
+    /* INPUT LIBRE */
+    .input-edit { 
+      width: 100%; height: 100%; border: none; background: transparent; 
+      padding: 0 10px; font-weight: 900; font-size: 16px; outline: none; 
+      text-align: center; color: var(--danger);
+    }
+    .input-edit:focus { background: white; color: #000; }
+
+    /* --- MODAL Y SERPIENTE ROJA ANCHA --- */
+    #modalReview { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 10000; }
+    .modal-box { background: white; width: 680px; padding: 45px; border-radius: 20px; position: relative; }
+    
+    .snake-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; border-radius: 20px; }
+    .snake-path { fill: none; stroke: var(--danger); stroke-width: 16; stroke-linecap: square; stroke-dasharray: 3000; stroke-dashoffset: 3000; }
+    .animate-snake { animation: snake-run 10s linear forwards; }
+    @keyframes snake-run { to { stroke-dashoffset: 0; } }
+
+    .btn-save-final { background: var(--success); color: white; border: none; padding: 20px; border-radius: 12px; font-weight: 900; cursor: pointer; width: 100%; opacity: 0.15; pointer-events: none; font-size: 18px; }
+    .btn-save-final.ready { opacity: 1; pointer-events: auto; }
+    .btn-edit { background: #444; color: white; border: none; padding: 12px; border-radius: 8px; margin-top: 15px; width: 100%; cursor: pointer; }
+
+    .btn-save-float { position: fixed; bottom: 30px; right: 30px; background: #000; color: white; border: none; padding: 22px 50px; border-radius: 60px; font-weight: 900; cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.5); display: none; z-index: 100; }
+
+    #ticket-container { position: absolute; left: -9999px; }
+    #ticket-preview { width: 750px; background: white; padding: 20px; }
+    .row-yellow-partial { background-color: #fff59d !important; }
+    .row-green-finished { background-color: #b9f6ca !important; }
+  </style>
+</head>
+<body>
+
+<div id="overlay">
+  <div class="tool-container">
+    <svg viewBox="0 0 500 150">
+      <defs><mask id="mask-text"><text x="250" y="110" fill="white" class="text-svg">TOOL CN</text></mask></defs>
+      <g class="clean-outline">
+        <text x="250" y="110" fill="white" class="text-svg">TOOL CN</text>
+        <g mask="url(#mask-text)"><rect class="liquid" x="0" y="0" width="500" height="150" fill="var(--vibrant-yellow)" /></g>
+      </g>
+    </svg>
+  </div>
+  <h2 id="load-msg" style="color:var(--primary); font-weight: 900;">CARGANDO RECEPCIÓN...</h2>
+</div>
+
+<div class="filter-bar">
+  <input type="text" id="mainFilter" class="search-input" placeholder="🔍 Filtrar registros..." onkeyup="render()">
+</div>
+
+<div class="container">
+  <table>
+    <thead>
+      <tr>
+        <th class="col-oc">FOLIO OC</th><th class="col-fec">FECHA OC</th><th class="col-pro">PROVEEDOR</th>
+        <th class="col-fol">REQUISICION</th><th class="col-can">CANT</th><th class="col-des">DESCRIPCION</th>
+        <th class="col-rec">RECIBIDO</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<button id="btnSave" class="btn-save-float" onclick="abrirRevision()">💾 GUARDAR (<span id="modCount">0</span>) CAMBIOS</button>
+
+<div id="modalReview">
+  <div class="modal-box" id="modalBox">
+    <svg class="snake-frame"><path id="snakePath" class="snake-path" d=""></path></svg>
+    <h2 style="margin-top:0; text-align:center; color:var(--primary)">🔍 REVISIÓN FINAL DE INGRESO</h2>
+    <div id="reviewContent" style="max-height: 380px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; border-radius: 10px; background: #fafafa;"></div>
+    <p style="font-size: 14px; color: var(--danger); margin-top: 20px; font-weight: 900; text-align: center;">⚠️ ESPERE A QUE LA BARRA ROJA COMPLETE EL CÍRCULO</p>
+    <button id="btnConfirmar" class="btn-save-final" onclick="procesarGuardado()">CONFIRMAR Y NOTIFICAR</button>
+    <button class="btn-edit" onclick="cerrarRevision()">VOLVER</button>
+  </div>
+</div>
+
+<!-- TICKET FANTASMA -->
+<div id="ticket-container">
+  <div id="ticket-preview">
+    <div style="text-align:center; font-weight:900; padding:15px; background:#f0f0f0; font-size:22px;">ENTRADA DE ALMACÉN</div>
+    <div style="padding:30px">
+        <h2 id="t-folio" style="color:var(--danger); font-size:35px; margin:0"></h2>
+        <p style="font-size:20px">SOLICITA: <b id="t-sol"></b></p>
+        <table style="width:100%; border-collapse:collapse; margin-top:25px; font-size:17px" border="1">
+            <thead><tr style="background:#eee"><th>CANT</th><th>UNI</th><th>DESCRIPCIÓN</th></tr></thead>
+            <tbody id="t-body"></tbody>
+        </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const CHAT_IDS_USUARIOS = {
+  "ALMACEN": "TU_ID_AQUI",
+  "EDI ZUÑIGA": "TU_ID_AQUI",
+  "ABRAHAM PENSADO": "1935511253",
+  "ALDAIR GÓMEZ": "859841328",
+  "REBECA ANGEL": "1293433169",
+  "JORGE SÁNCHEZ": "TU_ID_AQUI",
+  "EZEQUIEL VELAZQUEZ": "TU_ID_AQUI",
+  "PATRICIA TORRES": "1288025824",
+  "DAVID MONDRAGON": "35649383",
+  "ROBERTO DÍAZ": "625827165"
+};
+let datos = [], original = [], activeIdx = 0;
+
+window.onload = () => { init(); };
+
+function init() {
+  document.getElementById('overlay').style.display = 'flex';
+  google.script.run.withSuccessHandler(res => {
+    datos = res;
+    original = JSON.parse(JSON.stringify(res));
+    render();
+    document.getElementById('overlay').style.display = 'none';
+  }).obtenerDatosRecepcion();
+}
+
+function render() {
+  const filter = document.getElementById('mainFilter').value.toLowerCase();
+  const body = document.getElementById('tableBody');
+  const filtrados = datos.filter(item => Object.values(item).some(v => String(v).toLowerCase().includes(filter)));
+
+  body.innerHTML = filtrados.map((item, idx) => {
+    const oItem = original.find(o => o.id === item.id);
+    const mod = item.recibido != oItem.recibido;
+    const parcial = item.estado === "PARCIAL";
+    let clase = idx === activeIdx ? 'row-active' : '';
+    if(mod) clase += ' row-modified';
+    else if(parcial) clase += ' row-parcial';
+
+    return `<tr class="${clase}" onclick="activeIdx=${idx}; selectRow(${idx})">
+        <td align="center">${item.folioOC}</td>
+        <td align="center">${item.fechaOC}</td>
+        <td>${item.proveedor}</td>
+        <td align="center"><b>${item.folio}</b></td>
+        <td align="center"><b>${item.cant}</b></td>
+        <td>${item.desc}</td>
+        <td>
+            <input type="number" class="input-edit" id="input-${item.id}" value="${item.recibido}" 
+              oninput="updMemoria('${item.id}', this.value)"
+              onchange="validarFinal('${item.id}', this.value)"
+              onfocus="activeIdx=${idx}">
+        </td>
+    </tr>`;
+  }).join('');
+  actualizarContador();
+}
+
+function selectRow(idx) {
+    activeIdx = idx;
+    document.querySelectorAll('tr').forEach((r, i) => {
+        if(i>0) r.classList.toggle('row-active', (i-1) === idx);
+    });
+}
+
+// ESCRIBIR ES LIBRE (updMemoria solo guarda el dato, no refresca la UI)
+function updMemoria(id, val) {
+    const item = datos.find(d => d.id === id);
+    item.recibido = val;
+    actualizarContador();
+}
+
+// LA VALIDACIÓN OCURRE AL TERMINAR DE ESCRIBIR (onchange)
+function validarFinal(id, val) {
+    const item = datos.find(d => d.id === id);
+    const oItem = original.find(o => o.id === id);
+    const v = parseFloat(val || 0);
+
+    if (v > item.cant) {
+        alert("❌ No puede recibir más de " + item.cant);
+        item.recibido = item.cant;
+    } else if (v < oItem.recibido) {
+        alert("⚠️ No puede bajar la cantidad ya recibida anteriormente (" + oItem.recibido + ")");
+        item.recibido = oItem.recibido;
+    } else {
+        item.recibido = v;
+    }
+    render(); // Refrescamos solo al final
+    if(document.getElementById('modalReview').style.display === 'flex') renderTablaModal();
+}
+
+function actualizarContador() {
+  const modCount = datos.filter(item => item.recibido != original.find(o => o.id === item.id).recibido).length;
+  document.getElementById('btnSave').style.display = modCount > 0 ? 'block' : 'none';
+  document.getElementById('modCount').innerText = modCount;
+}
+
+document.onkeydown = (e) => {
+    if (document.activeElement.tagName === "INPUT") return;
+    if (e.key === "ArrowUp" && activeIdx > 0) { activeIdx--; selectRow(activeIdx); e.preventDefault(); }
+    if (e.key === "ArrowDown" && activeIdx < datos.length - 1) { activeIdx++; selectRow(activeIdx); e.preventDefault(); }
+};
+
+function abrirRevision() {
+  renderTablaModal();
+  document.getElementById('modalReview').style.display = 'flex';
+  iniciarSerpiente();
+}
+
+function renderTablaModal() {
+  const lote = datos.filter(item => item.recibido != original.find(o => o.id === item.id).recibido);
+  let html = `<table style="width:100%; border-collapse:collapse; font-size:15px; background:white;" border="1">
+    <tr style="background:#444; color:white;"><th>CANT</th><th>DESCRIPCIÓN</th><th width="110">NUEVO RECIBIDO</th></tr>`;
+  lote.forEach(item => {
+    html += `<tr>
+      <td align="center"><b>${item.cant}</b></td>
+      <td style="padding:5px;">${item.desc}</td>
+      <td><input type="number" class="input-edit" style="background:#fffde7; border:1px solid #ccc;" value="${item.recibido}" onchange="validarFinal('${item.id}', this.value)"></td>
+    </tr>`;
+  });
+  html += `</table>`;
+  document.getElementById('reviewContent').innerHTML = html;
+}
+
+function iniciarSerpiente() {
+  const box = document.getElementById('modalBox');
+  const w = box.offsetWidth;
+  const h = box.offsetHeight;
+  const path = document.getElementById('snakePath');
+  const btn = document.getElementById('btnConfirmar');
+  const midW = w / 2;
+  const d = `M ${midW} 0 L ${w} 0 L ${w} ${h} L 0 ${h} L 0 0 L ${midW} 0`;
+  path.setAttribute('d', d);
+  const totalLength = path.getTotalLength();
+  path.style.strokeDasharray = totalLength;
+  path.style.strokeDashoffset = totalLength;
+  path.classList.remove('animate-snake');
+  btn.classList.remove('ready');
+  setTimeout(() => {
+    path.classList.add('animate-snake');
+    setTimeout(() => { btn.classList.add('ready'); }, 10000);
+  }, 100);
+}
+
+function cerrarRevision() { document.getElementById('modalReview').style.display = 'none'; }
+
+async function procesarGuardado() {
+  const lote = datos.filter(item => item.recibido != original.find(o => o.id === item.id).recibido);
+  document.getElementById('modalReview').style.display = 'none';
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('load-msg').innerText = "PROCESANDO ENTRADA...";
+
+  google.script.run.withSuccessHandler(async resMeta => {
+    await notificarTelegram(resMeta);
+    init();
+  }).guardarRecepcionLote(lote);
+}
+
+async function notificarTelegram(metaData) {
+  for (const fR in metaData) {
+    const info = metaData[fR];
+    if (info.msg_id && CHAT_IDS_USUARIOS[info.solicitante.toUpperCase()]) {
+      document.getElementById('t-folio').innerText = fR;
+      document.getElementById('t-sol').innerText = info.solicitante;
+      let hayTerminados = false;
+      let h = "";
+      info.partidas.forEach(p => {
+        let clase = "";
+        if(p.estado === "TERMINADO") { clase = "row-green-finished"; hayTerminados = true; }
+        if(p.estado === "PARCIAL") { clase = "row-yellow-partial"; }
+        h += `<tr class="${clase}"><td align="center">${p.cantidad}</td><td>${p.unidad}</td><td>${p.descripcion}</td></tr>`;
+      });
+      document.getElementById('t-body').innerHTML = h;
+      const canvas = await html2canvas(document.getElementById('ticket-preview'), {scale: 2});
+      await new Promise(resolve => {
+        google.script.run.withSuccessHandler(resolve).notificarRecepcionTelegram(
+          canvas.toDataURL("image/png"), fR, CHAT_IDS_USUARIOS[info.solicitante.toUpperCase()], info.msg_id, hayTerminados
+        );
+      });
+    }
+  }
+}
+</script>
+</body>
+</html>

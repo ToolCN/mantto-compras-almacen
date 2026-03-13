@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root { 
+      --primary: #1a237e; --bg: #f4f7f6; --success: #2e7d32; 
+      --danger: #d32f2f; --purple: #7b1fa2; --vibrant-yellow: #FFFF00;
+    }
+    body { font-family: 'Roboto', sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+    
+    /* --- LOGO NUCLEAR --- */
+    #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .tool-container { width: 450px; height: 140px; }
+    .text-svg { font-size: 100px; font-weight: 900; text-anchor: middle; }
+    .liquid { animation: fill-anim 3s infinite ease-in-out; }
+    @keyframes fill-anim { 0%, 100% { transform: translateY(120px); } 50% { transform: translateY(0px); } }
+    .clean-outline { filter: drop-shadow(2px 0px 0px black) drop-shadow(-2px 0px 0px black) drop-shadow(0px 2px 0px black) drop-shadow(0px -2px 0px black); }
+
+    .container { max-width: 1280px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+    .tab { padding: 15px 25px; cursor: pointer; font-weight: 900; color: #777; transition: 0.3s; border-radius: 10px 10px 0 0; }
+    .tab.active { background: var(--primary); color: white; }
+    .view-content { display: none; }
+    .view-content.active { display: block; }
+
+    .table-ui { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+    .table-ui th { background: #f8f9fa; padding: 10px; border: 1px solid #ddd; font-weight: 900; }
+    .table-ui td { padding: 5px; border: 1px solid #eee; height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .prov-group { margin-bottom: 30px; border: 2px solid #eee; border-radius: 12px; overflow: hidden; }
+    .prov-header { background: #f0f4f8; padding: 12px 20px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ddd; }
+    
+    .input-edit { width: 100%; border: 1px solid #ccc; padding: 6px; border-radius: 4px; font-size: 12px; font-weight: 900; text-align: right; box-sizing: border-box; }
+    .total-val { background: #f1f1f1; color: var(--danger); border: none; font-size: 13px; }
+    .btn-sel { background: none; border: 1px solid var(--primary); color: var(--primary); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 10px; font-weight: 900; margin-right: 5px; }
+    .search-ui { width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 10px; margin-bottom: 15px; outline: none; font-weight: bold; }
+
+    /* --- ESTILOS TICKET FANTASMA --- */
+    #ticket-container { position: absolute; left: -9999px; }
+    #ticket-preview { width: 750px; background: white; position: relative; padding-bottom: 20px; }
+    .ticket-body { background: white; margin: 0 15px; padding: 20px; border-radius: 5px; }
+    .t-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .t-table th, .t-table td { border: 1.5px solid #000; padding: 8px; font-size: 13px; text-transform: uppercase; color: #000; }
+    .t-table th { background: #f0f0f0; font-weight: 900; }
+    .prio-banner { text-align: center; font-weight: 900; padding: 12px; font-size: 20px; text-transform: uppercase; color: #000; }
+    
+    .prog-container { display: flex; justify-content: space-between; position: relative; margin: 30px 40px; font-weight: 900; font-size: 10px; text-transform: uppercase; color: #333; }
+    .prog-line { position: absolute; top: 18px; left: 0; width: 100%; height: 6px; background: #eee; z-index: 1; border-radius: 3px; }
+    .prog-line-fill { position: absolute; top: 18px; left: 0; height: 6px; background: #1a237e; z-index: 2; border-radius: 3px; width: 0%; transition: width 0.8s; }
+    .step { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; width: 80px; }
+    .circle { width: 40px; height: 40px; background: white; border: 4px solid #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; font-size: 18px; font-weight: 900; color: #ddd; }
+
+    /* ESTADO AUTORIZADO (TICKET) */
+    .estado-autorizado .circle-1, .estado-autorizado .circle-2 { background: #eee !important; color: #999 !important; border-color: #999 !important; }
+    .estado-autorizado .circle-3 { background: #fff3e0 !important; border-color: #ff9800 !important; color: #ff9800 !important; }
+    .estado-autorizado #p-fill { width: 60% !important; background: #ff9800 !important; }
+    .row-orange-auth { background-color: #fff3e0 !important; }
+  </style>
+</head>
+<body>
+
+<div id="overlay">
+  <div class="tool-container">
+    <svg viewBox="0 0 500 150">
+      <defs><mask id="mask-text"><text x="250" y="110" fill="white" class="text-svg">TOOL CN</text></mask></defs>
+      <g class="clean-outline">
+        <text x="250" y="110" fill="white" class="text-svg">TOOL CN</text>
+        <g mask="url(#mask-text)"><rect class="liquid" x="0" y="0" width="500" height="150" fill="var(--vibrant-yellow)" /></g>
+      </g>
+    </svg>
+  </div>
+  <h2 id="msg" style="color:var(--primary); font-weight: 900;">Sincronizando Datos...</h2>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(event, 'view-gen')">📦 GENERAR ÓRDENES</div>
+    <div class="tab" onclick="switchTab(event, 'view-hist')">📂 ÓRDENES GENERADAS</div>
+  </div>
+
+  <div id="view-gen" class="view-content active">
+    <div id="lista-cotizados"></div>
+  </div>
+
+  <div id="view-hist" class="view-content">
+    <input type="text" id="busquedaHist" class="search-ui" placeholder="🔍 Filtrar historial..." onkeyup="filtrarHistorial()">
+    <table class="table-ui">
+      <thead>
+        <tr><th width="80">FOLIO</th><th>FECHA</th><th>PROVEEDOR</th><th width="120">TOTAL</th><th width="80">MONEDA</th><th width="100">ESTADO</th><th width="120">ACCIONES</th></tr>
+      </thead>
+      <tbody id="body-historial"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TICKET FANTASMA PARA TELEGRAM -->
+<div id="ticket-container">
+  <div id="ticket-preview" class="estado-autorizado">
+    <div class="prio-banner" id="t-banner-top"></div>
+    <div class="prog-container">
+      <div class="prog-line"></div><div class="prog-line-fill" id="p-fill"></div>
+      <div class="step"><div class="circle circle-1">1</div>Solicitado</div>
+      <div class="step"><div class="circle circle-2">2</div>Cotizado</div>
+      <div class="step"><div class="circle circle-3">3</div>Autorizado</div>
+      <div class="step"><div class="circle circle-4">4</div>Parcial</div>
+      <div class="step"><div class="circle circle-5">5</div>Terminado</div>
+    </div>
+    <div class="ticket-body">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2.5px solid #000; padding-bottom:12px;">
+        <div><h2 style="margin:0; text-transform:uppercase;">Requisición de Compra</h2><b id="t-folio" style="font-size:24px; color:red;"></b></div>
+        <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" width="150">
+      </div>
+      <div style="margin-top:10px; font-size:16px;">SOLICITA: <b id="t-sol"></b></div>
+      <table class="t-table"><thead><tr><th width="60">CANT</th><th width="90">UNI</th><th>DESCRIPCIÓN</th></tr></thead><tbody id="t-body"></tbody></table>
+      <div style="margin-top:10px; border-top:2px solid #000; padding-top:10px; font-size:14px;"><b>OBS:</b> <span id="t-obs"></span></div>
+    </div>
+    <div class="prio-banner" id="t-banner-bottom"></div>
+  </div>
+</div>
+
+<script>
+const CHAT_IDS_USUARIOS = {
+  "ALMACEN": "TU_ID_AQUI",
+  "EDI ZUÑIGA": "TU_ID_AQUI",
+  "ABRAHAM PENSADO": "1935511253",
+  "ALDAIR GÓMEZ": "859841328",
+  "REBECA ANGEL": "1293433169",
+  "JORGE SÁNCHEZ": "TU_ID_AQUI",
+  "EZEQUIEL VELAZQUEZ": "TU_ID_AQUI",
+  "PATRICIA TORRES": "1288025824",
+  "DAVID MONDRAGON": "35649383",
+  "ROBERTO DÍAZ": "625827165"
+};
+let datosCotizados = [];
+let datosHistorial = [];
+const USUARIO = "<?!= (typeof usuario_inyectado !== 'undefined') ? usuario_inyectado : 'USUARIO' ?>";
+const nF2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true });
+
+window.onload = () => { cargarTodo(); };
+
+function cargarTodo() {
+  document.getElementById('overlay').style.display = 'flex';
+  google.script.run.withSuccessHandler(res => {
+    datosCotizados = res || [];
+    renderGeneracion();
+    google.script.run.withSuccessHandler(res2 => {
+      datosHistorial = res2 || [];
+      renderHistorial();
+      document.getElementById('overlay').style.display = 'none';
+    }).getOrdenesRecientes();
+  }).getPartidasCotizadas();
+}
+
+function switchTab(evt, tabId) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+  evt.currentTarget.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+function renderGeneracion() {
+  const container = document.getElementById('lista-cotizados');
+  if (!datosCotizados.length) { container.innerHTML = "<h3 style='text-align:center; padding:50px; color:#999'>No hay partidas pendientes.</h3>"; return; }
+  const grupos = datosCotizados.reduce((acc, item) => {
+    const prov = item.proveedor || "SIN PROVEEDOR";
+    if (!acc[prov]) acc[prov] = [];
+    acc[prov].push(item);
+    return acc;
+  }, {});
+  let html = "";
+  for (const prov in grupos) {
+    const safeProv = prov.replace(/[^a-z0-9]/gi,'');
+    html += `
+      <div class="prov-group">
+        <div class="prov-header">
+          <div>🏢 PROVEEDOR: ${prov}<br><button class="btn-sel" onclick="toggleChecks('${safeProv}', true)">☑ Todos</button><button class="btn-sel" onclick="toggleChecks('${safeProv}', false)">☐ Ninguno</button></div>
+          <button style="background:var(--success); color:white; border:none; padding:12px 25px; border-radius:8px; cursor:pointer; font-weight:900;" onclick="generarLote('${prov}')">GENERAR OC</button>
+        </div>
+        <table class="table-ui">
+          <thead><tr><th width="40"></th><th>DESCRIPCIÓN</th><th width="70">CANT</th><th width="100">P.UNIT</th><th width="90">IVA</th><th width="130">TOTAL</th><th width="60">MON</th></tr></thead>
+          <tbody>
+          ${grupos[prov].map(p => `
+            <tr id="row-${p.id}"><td align="center"><input type="checkbox" class="check-${safeProv}" value="${p.id}" checked></td><td><b>${p.desc}</b></td>
+              <td><input type="number" class="input-edit cant" value="${p.cant}" oninput="recalc('${p.id}')"></td>
+              <td><input type="number" class="input-edit precio" value="${parseFloat(p.precio).toFixed(2)}" step="0.01" oninput="recalc('${p.id}')"></td>
+              <td><input type="number" class="input-edit iva" value="${parseFloat(p.iva).toFixed(2)}" step="0.01" oninput="recalc('${p.id}', true)"></td>
+              <td><input type="text" class="input-edit total total-val" value="${nF2.format(p.total)}" readonly></td>
+              <td align="center"><b>${p.moneda}</b></td><input type="hidden" class="uni" value="${p.uni}"><input type="hidden" class="moneda-val" value="${p.moneda}"></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function toggleChecks(safeProv, state) { document.querySelectorAll(`.check-${safeProv}`).forEach(c => c.checked = state); }
+function recalc(id, manualIva = false) {
+  const row = document.getElementById('row-'+id);
+  const c = parseFloat(row.querySelector('.cant').value || 0), p = parseFloat(row.querySelector('.precio').value || 0);
+  let iva = parseFloat(row.querySelector('.iva').value || 0);
+  if (!manualIva) { iva = c * p * 0.16; row.querySelector('.iva').value = iva.toFixed(2); }
+  row.querySelector('.total').value = nF2.format((c * p) + iva);
+}
+
+function generarLote(prov) {
+  const safeProv = prov.replace(/[^a-z0-9]/gi,'');
+  const checks = document.querySelectorAll(`.check-${safeProv}:checked`);
+  if(!checks.length) return alert("Seleccione partidas");
+  const seleccionadas = Array.from(checks).map(c => {
+    const id = c.value, row = document.getElementById('row-'+id);
+    const cant = parseFloat(row.querySelector('.cant').value), pre = parseFloat(row.querySelector('.precio').value), iva = parseFloat(row.querySelector('.iva').value);
+    return { fila: datosCotizados.find(d => d.id === id).fila, cant, uni: row.querySelector('.uni').value, desc: row.querySelector('b').innerText, precio: pre, iva, total: (cant * pre) + iva, moneda: row.querySelector('.moneda-val').value, proveedor: prov };
+  });
+  if(!confirm("¿Generar OC para " + prov + "?")) return;
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('msg').innerText = "GENERANDO ORDEN...";
+  google.script.run.withSuccessHandler(res => {
+    if(res.success){
+      actualizarTelegramMasivoAutorizado(res.metaData, res.folio);
+    } else { alert("Error: " + res.error); document.getElementById('overlay').style.display = 'none'; }
+  }).crearOrdenCompra(seleccionadas, prov, seleccionadas[0].moneda, USUARIO);
+}
+
+async function actualizarTelegramMasivoAutorizado(metaData, folioOC) {
+  const ticket = document.getElementById('ticket-preview');
+  for (const folioR in metaData) {
+    const info = metaData[folioR];
+    if (info.msg_id && CHAT_IDS_USUARIOS[info.solicitante.toUpperCase()]) {
+      document.getElementById('msg').innerText = "NOTIFICANDO AUTORIZACIÓN: " + folioR + "...";
+      document.getElementById('t-folio').innerText = folioR;
+      document.getElementById('t-sol').innerText = info.solicitante;
+      document.getElementById('t-obs').innerText = (info.observaciones || "").toUpperCase();
+      let h = "";
+      info.partidas.forEach(p => {
+        const isAuth = p.estado === "AUTORIZADO";
+        h += `<tr class="${isAuth ? 'row-orange-auth' : ''}"><td>${p.cantidad}</td><td>${p.unidad}</td><td>${p.descripcion}</td></tr>`;
+      });
+      document.getElementById('t-body').innerHTML = h;
+      const canvas = await html2canvas(ticket, {scale: 2});
+      await new Promise((resolve, reject) => {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).notificarAutorizacionTelegram(canvas.toDataURL("image/png"), folioR, CHAT_IDS_USUARIOS[info.solicitante.toUpperCase()], info.msg_id);
+      });
+    }
+  }
+  document.getElementById('msg').innerText = "¡AVANCES NOTIFICADOS!";
+  setTimeout(() => { window.open("<?!= ScriptApp.getService().getUrl() ?>?v=imprimiroc&folio=" + encodeURIComponent(folioOC), '_blank'); cargarTodo(); }, 800);
+}
+
+function renderHistorial() {
+  const body = document.getElementById('body-historial');
+  body.innerHTML = datosHistorial.map(h => `<tr class="${h.estado === 'CANCELADA' ? 'row-cancelada' : ''}"><td align="center"><b>${h.folio}</b></td><td>${h.fecha}</td><td>${h.proveedor}</td><td align="right"><b>$ ${nF2.format(h.total)}</b></td><td align="center">${h.moneda}</td><td align="center"><b>${h.estado}</b></td><td align="center"><button class="btn-sel" onclick="reimprimir('${h.folio}')">🖨️ VER</button>${h.estado !== 'CANCELADA' ? `<button class="btn-sel" style="color:red" onclick="cancelar('${h.folio}', ${h.fila})">❌</button>` : ''}</td></tr>`).join('');
+}
+function filtrarHistorial() { const val = document.getElementById('busquedaHist').value.toLowerCase(); document.querySelectorAll('#body-historial tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(val) ? '' : 'none'); }
+function reimprimir(folio) { window.open("<?!= ScriptApp.getService().getUrl() ?>?v=imprimiroc&folio=" + folio, '_blank'); }
+function cancelar(folio, fila) { if(!confirm("¿Cancelar " + folio + "?")) return; google.script.run.withSuccessHandler(() => { alert("Cancelada"); cargarTodo(); }).cancelarOC(folio, fila); }
+</script>
+</body>
+</html>

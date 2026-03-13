@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd /c \"clasp push && clasp deploy --deploymentId AKfycbzZcStBdIBWL6Zmot6u8uBD3X-tST7uCe6hJ1Iqqrv1FLZsH7HtyFjGz1J3GvfCiO8CBQ\")",
+      "Bash(cd \"C:\\\\Users\\\\rcdga\\\\mantto-compras-almacen\" && clasp push && clasp deploy --deploymentId AKfycbzZcStBdIBWL6Zmot6u8uBD3X-tST7uCe6hJ1Iqqrv1FLZsH7HtyFjGz1J3GvfCiO8CBQ)",
+      "Bash(clasp push:*)",
+      "Bash(cd \"C:/Users/rcdga/mantto-compras-almacen\" && clasp push && clasp deploy --deploymentId AKfycbzZcStBdIBWL6Zmot6u8uBD3X-tST7uCe6hJ1Iqqrv1FLZsH7HtyFjGz1J3GvfCiO8CBQ)",
+      "Bash(cd \"C:/Users/rcdga/mantto-compras-almacen\" && clasp pull)",
+      "Bash(python3 - << 'PYEOF'\nimport re\n\nwith open\\('/C/Users/rcdga/mantto-compras-almacen/ManttoGS.js', 'r', encoding='utf-8'\\) as f:\n    content = f.read\\(\\)\n\n# Find the block to replace using a pattern that avoids unicode issues\nold_block = re.search\\(\n    r'      else if \\\\\\(nuevo === \"CERRADA\"\\\\\\) \\\\{.*?        sheet\\\\.getRange\\\\\\(fila, 18\\\\\\)\\\\.setValue\\\\\\(\"CERRADA\"\\\\\\);\\\\n      \\\\}',\n    content, re.DOTALL\n\\)\nif old_block:\n    print\\(\"FOUND at:\", old_block.start\\(\\), old_block.end\\(\\)\\)\n    print\\(\"---\"\\)\n    print\\(repr\\(old_block.group\\(\\)[:200]\\)\\)\nelse:\n    print\\(\"NOT FOUND\"\\)\nPYEOF)",
+      "Bash(node -e \"\nconst fs = require\\('fs'\\);\nconst content = fs.readFileSync\\('/C/Users/rcdga/mantto-compras-almacen/ManttoGS.js', 'utf8'\\);\nconst match = content.match\\(/      else if \\\\\\(nuevo === \\\\\"CERRADA\\\\\"\\\\\\) \\\\{[\\\\s\\\\S]*?        sheet\\\\.getRange\\\\\\(fila, 18\\\\\\)\\\\.setValue\\\\\\(\\\\\"CERRADA\\\\\"\\\\\\);\\\\n      \\\\}/\\);\nif \\(match\\) {\n  console.log\\('FOUND at index:', content.indexOf\\(match[0]\\)\\);\n  console.log\\('Length:', match[0].length\\);\n  console.log\\(JSON.stringify\\(match[0].substring\\(0, 100\\)\\)\\);\n} else {\n  console.log\\('NOT FOUND'\\);\n}\n\")",
+      "Bash(sed -n '2276,2298p' \"/C/Users/rcdga/mantto-compras-almacen/ManttoGS.js\" | xxd | head -60)",
+      "Bash(cmd /k \"clasp push && clasp deploy --deploymentId AKfycbzZcStBdIBWL6Zmot6u8uBD3X-tST7uCe6hJ1Iqqrv1FLZsH7HtyFjGz1J3GvfCiO8CBQ\")",
+      "Bash(cd \"/C/Users/rcdga/mantto-compras-almacen\" && clasp push && clasp deploy --deploymentId AKfycbzZcStBdIBWL6Zmot6u8uBD3X-tST7uCe6hJ1Iqqrv1FLZsH7HtyFjGz1J3GvfCiO8CBQ)"
+    ]
+  }
+}

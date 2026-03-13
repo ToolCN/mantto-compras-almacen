@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; }
+    .tool-container { width: 450px; height: 140px; }
+    .text-svg { font-size: 80px; font-weight: 900; text-anchor: middle; font-family: sans-serif; }
+    .liquid { animation: fill-anim 3s infinite ease-in-out; fill: #004a99; }
+    @keyframes fill-anim { 0%, 100% { transform: translateY(100px); } 50% { transform: translateY(-10px); } }
+    .clean-outline { fill: none; stroke: black; stroke-width: 2px; }
+
+    body { background-color: #f4f7f6; font-size: 0.82rem; }
+    .header-box { background: white; padding: 10px 20px; border-bottom: 3px solid #004a99; display: flex; justify-content: space-between; align-items: center; }
+    .logo { height: 45px; }
+    .update-text { color: red; font-weight: bold; font-size: 0.85rem; }
+    
+    .nav-tabs .nav-link { font-weight: bold; color: #555; }
+    .nav-tabs .nav-link.active { color: #004a99; border-bottom: 3px solid #004a99; }
+
+    .table-main thead { background: #004a99; color: white; position: sticky; top: 0; z-index: 10; }
+    .clickable-header { cursor: pointer; border-left: 1px solid #ffffff33; white-space: nowrap; }
+    .clickable-header:hover { background: #003a7a !important; }
+
+    /* Totales Guinda */
+    .row-totales { background-color: #f8f8f8 !important; color: #800000; font-weight: bold; font-size: 1rem; }
+
+    .table-insp { width: 100%; border: 1px solid #333; background: white; font-size: 0.7rem; }
+    .table-insp th { background: #f0f0f0; border: 1px solid #333; color: #004a99; text-align: center; }
+    .table-insp td { border: 1px solid #333; text-align: center; }
+    .val-red { color: red; font-weight: bold; }
+    .no-data-watermark { color: #ddd; font-weight: 900; font-size: 1.1rem; letter-spacing: 2px; opacity: 0.6; }
+
+    .filter-list { max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; }
+  </style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="tool-container">
+    <svg viewBox="0 0 450 140">
+      <defs><clipPath id="clip"><text x="225" y="100" class="text-svg">TOOL CN</text></clipPath></defs>
+      <rect x="0" y="0" width="450" height="140" class="liquid" clip-path="url(#clip)" />
+      <text x="225" y="100" class="text-svg clean-outline">TOOL CN</text>
+    </svg>
+  </div>
+  <p class="fw-bold text-muted small">CONSOLIDANDO INFORMACIÓN...</p>
+</div>
+
+<div class="header-box shadow-sm">
+  <div>
+    <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" class="logo">
+    <h6 class="fw-bold mt-1 mb-0" id="mainTitle">EXISTENCIA DE ALAMBRON</h6>
+  </div>
+  <div class="text-end">
+    <div id="timestamp" class="update-text"></div>
+    <div class="mt-1">
+      <button class="btn btn-outline-secondary btn-sm me-2" onclick="limpiarFiltros()">Quitar todos los filtros</button>
+      <button class="btn btn-success btn-sm" onclick="exportarExcel()">Exportar a Excel</button>
+    </div>
+  </div>
+</div>
+
+<ul class="nav nav-tabs px-3 mt-2" id="myTab" role="tablist">
+  <li class="nav-item"><button class="nav-link active" onclick="cambiarVista('resumen')">RESUMEN</button></li>
+  <li class="nav-item"><button class="nav-link" onclick="cambiarVista('detallada')">EXISTENCIA DETALLADA</button></li>
+</ul>
+
+<div class="container-fluid py-2">
+  <div class="table-responsive bg-white rounded shadow-sm" style="max-height: 70vh;">
+    <!-- TABLA VISTA 1: RESUMEN -->
+    <table id="tablaResumen" class="table table-sm table-hover mb-0 table-main">
+      <thead>
+        <tr>
+          <th class="clickable-header" onclick="abrirFiltro('diametro')">DIÁMETRO <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('aceroLimpio')">ACERO <i class="fas fa-filter"></i></th>
+          <th>ROLLOS</th>
+          <th>KILOS TOTAL</th>
+          <th class="text-center">DETALLE</th>
+        </tr>
+      </thead>
+      <tbody id="bodyResumen"></tbody>
+      <tfoot id="footResumen"></tfoot>
+    </table>
+
+    <!-- TABLA VISTA 2: DETALLADA -->
+    <table id="tablaDetallada" class="table table-sm table-hover mb-0 table-main d-none">
+      <thead>
+        <tr>
+          <th class="clickable-header" onclick="abrirFiltro('proveedor')">PROVEEDOR <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('fecha')">FECHA <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('diametro')">DIAM. <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('aceroFull')">ACERO <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('n_rollo')">N_ROLLO <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('kilos')">KILOS <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('colada')">COLADA <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('sello')">SELLO <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('n_remision')">REMISION <i class="fas fa-filter"></i></th>
+          <th class="clickable-header" onclick="abrirFiltro('consecutivo')">CONS. <i class="fas fa-filter"></i></th>
+          <th>INSPECCIÓN DETALLADA</th>
+        </tr>
+      </thead>
+      <tbody id="bodyDetallada"></tbody>
+      <tfoot id="footDetallada"></tfoot>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL FILTRO -->
+<div class="modal fade" id="modalFiltro" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-1">
+        <h6 class="modal-title fw-bold" id="titFiltro"></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="busFiltro" class="form-control form-control-sm mb-2" placeholder="Buscar..." oninput="filtrarChecks()">
+        <div class="d-flex justify-content-between mb-2 small">
+          <span style="color: blue; cursor: pointer; text-decoration: underline;" onclick="toggleTodos(event, true)">Marcar todos</span>
+          <span style="color: blue; cursor: pointer; text-decoration: underline;" onclick="toggleTodos(event, false)">Desmarcar</span>
+        </div>
+        <div id="listaChecks" class="filter-list"></div>
+      </div>
+      <div class="modal-footer py-1">
+        <button type="button" class="btn btn-primary btn-sm w-100" onclick="aplicarFiltros()">Aplicar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+  let dataGlobal = [];
+  let filtros = {};
+  let vistaActual = 'resumen'; 
+  let tipoActual = '';
+  const modalFiltro = new bootstrap.Modal(document.getElementById('modalFiltro'));
+
+  window.onload = () => {
+    actualizarTimestamp();
+    google.script.run.withSuccessHandler(data => {
+      dataGlobal = data;
+      resetFiltrosObject();
+      renderizar();
+      document.getElementById('loader').style.display = 'none';
+    }).getMateriaPrimaData();
+  };
+
+  function actualizarTimestamp() {
+    const d = new Date();
+    document.getElementById('timestamp').innerText = `ULTIMA ACTUALIZACION EL ${d.toLocaleDateString()} a las ${d.toLocaleTimeString()} HRS`;
+  }
+
+  function resetFiltrosObject() {
+    const cols = ['proveedor', 'fecha', 'diametro', 'aceroFull', 'aceroLimpio', 'n_rollo', 'kilos', 'colada', 'sello', 'n_remision', 'consecutivo'];
+    cols.forEach(c => filtros[c] = [...new Set(dataGlobal.map(i => i[c].toString()))]);
+  }
+
+  function limpiarFiltros() {
+    resetFiltrosObject();
+    renderizar();
+  }
+
+  function cambiarVista(v) {
+    vistaActual = v;
+    document.querySelectorAll('.nav-link').forEach(btn => btn.classList.toggle('active', btn.innerText.toLowerCase().includes(v)));
+    document.getElementById('tablaResumen').classList.toggle('d-none', v !== 'resumen');
+    document.getElementById('tablaDetallada').classList.toggle('d-none', v !== 'detallada');
+    document.getElementById('mainTitle').innerText = v === 'resumen' ? 'EXISTENCIA DE ALAMBRON' : 'EXISTENCIA ALAMBRON DETALLADA';
+    renderizar();
+  }
+
+  function abrirFiltro(tipo) {
+    tipoActual = tipo;
+    // Filtro combinado: mostrar opciones basadas en lo que NO sea este filtro
+    const dataSub = dataGlobal.filter(i => {
+      return Object.keys(filtros).every(k => k === tipo || filtros[k].includes(i[k].toString()));
+    });
+    
+    const opciones = [...new Set(dataSub.map(i => i[tipo].toString()))].sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
+    
+    document.getElementById('titFiltro').innerText = `Filtrar ${tipo.toUpperCase()}`;
+    document.getElementById('listaChecks').innerHTML = opciones.map(opt => `
+      <div class="form-check">
+        <input class="form-check-input check-item" type="checkbox" value="${opt}" ${filtros[tipo].includes(opt) ? 'checked' : ''}>
+        <label class="form-check-label">${opt}</label>
+      </div>
+    `).join('');
+    modalFiltro.show();
+  }
+
+  function filtrarChecks() {
+    const val = document.getElementById('busFiltro').value.toLowerCase();
+    document.querySelectorAll('.form-check').forEach(el => el.style.display = el.innerText.toLowerCase().includes(val) ? 'block' : 'none');
+  }
+
+  function toggleTodos(e, val) {
+    e.preventDefault();
+    document.querySelectorAll('.check-item').forEach(cb => { if(cb.parentElement.style.display !== 'none') cb.checked = val; });
+  }
+
+  function aplicarFiltros() {
+    filtros[tipoActual] = Array.from(document.querySelectorAll('.check-item:checked')).map(cb => cb.value);
+    renderizar();
+    modalFiltro.hide();
+  }
+
+  function renderizar() {
+    const dataFiltrada = dataGlobal.filter(i => Object.keys(filtros).every(k => filtros[k].includes(i[k].toString())));
+
+    if (vistaActual === 'resumen') renderVistaResumen(dataFiltrada);
+    else renderVistaDetallada(dataFiltrada);
+  }
+
+  function renderVistaResumen(data) {
+    const body = document.getElementById('bodyResumen');
+    body.innerHTML = '';
+    
+    // Agrupar por Diametro y AceroLimpio
+    const agrupado = {};
+    data.forEach(i => {
+      const key = `${i.diametro}|${i.aceroLimpio}`;
+      if (!agrupado[key]) agrupado[key] = { diametro: i.diametro, acero: i.aceroLimpio, rollos: 0, kilos: 0, detalles: [] };
+      agrupado[key].rollos++;
+      agrupado[key].kilos += i.kilos;
+      agrupado[key].detalles.push(i);
+    });
+
+    let tRollos = 0, tKilos = 0;
+    Object.values(agrupado).sort((a,b) => (parseInt(a.acero)-parseInt(b.acero)) || (a.diametro-b.diametro)).forEach((group, idx) => {
+      tRollos += group.rollos;
+      tKilos += group.kilos;
+      body.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td>${group.diametro}</td><td class="fw-bold">${group.acero}</td><td>${group.rollos}</td><td>${group.kilos.toLocaleString()} kg</td>
+          <td class="text-center"><button type="button" class="btn btn-sm btn-link p-0" onclick="toggleSubRow(${idx})"><i class="fas fa-plus-circle"></i></button></td>
+        </tr>
+        <tr id="sub-${idx}" class="d-none bg-light">
+          <td colspan="5" class="p-2">${renderSubTabla(group.detalles)}</td>
+        </tr>
+      `);
+    });
+
+    document.getElementById('footResumen').innerHTML = `<tr class="row-totales"><td colspan="2">TOTALES</td><td>${tRollos}</td><td>${tKilos.toLocaleString()} kg</td><td></td></tr>`;
+  }
+
+  function renderVistaDetallada(data) {
+    const body = document.getElementById('bodyDetallada');
+    body.innerHTML = '';
+    let tKilos = 0;
+    data.forEach(i => {
+      tKilos += i.kilos;
+      body.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td>${i.proveedor}</td><td>${i.fecha}</td><td>${i.diametro}</td><td>${i.aceroFull}</td><td>${i.n_rollo}</td>
+          <td>${i.kilos.toLocaleString()}</td><td>${i.colada}</td><td>${i.sello}</td><td>${i.n_remision}</td><td>${i.consecutivo}</td>
+          <td>${renderInspInline(i)}</td>
+        </tr>
+      `);
+    });
+    document.getElementById('footDetallada').innerHTML = `<tr class="row-totales"><td colspan="5">TOTAL REGISTROS: ${data.length}</td><td colspan="6">TOTAL KILOS: ${tKilos.toLocaleString()} kg</td></tr>`;
+  }
+
+  function renderSubTabla(detalles) {
+    return `
+      <table class="table table-sm table-bordered bg-white shadow-sm mb-0">
+        <thead class="table-secondary"><tr><th>FECHA</th><th>PROVEEDOR</th><th>KILOS</th><th>COLADA</th><th>SELLO</th><th>INSPECCIÓN DETALLADA</th></tr></thead>
+        <tbody>${detalles.map(d => `<tr><td>${d.fecha}</td><td>${d.proveedor}</td><td>${d.kilos}</td><td>${d.colada}</td><td>${d.sello}</td><td>${renderInspInline(d)}</td></tr>`).join('')}</tbody>
+      </table>
+    `;
+  }
+
+  function renderInspInline(d) {
+    if (!d.tieneInsp) return '<div class="no-data-watermark text-center small">SIN DATOS</div>';
+    return `
+      <table class="table-insp">
+        <tr><th rowspan="2">INSPECCION<br>${d.f_insp}</th><th colspan="2">COLA</th><th colspan="2">PUNTA</th><th>RESISTENCIA</th></tr>
+        <tr>
+          <td>P: <span class="val-red">${d.c_parc || '-'}</span></td><td>T: <span class="val-red">${d.c_total || '-'}</span></td>
+          <td>P: <span class="val-red">${d.p_parc || '-'}</span></td><td>T: <span class="val-red">${d.p_total || '-'}</span></td>
+          <td>${d.res_c || '-'} / ${d.res_p || '-'}</td>
+        </tr>
+      </table>
+    `;
+  }
+
+  function toggleSubRow(idx) { document.getElementById(`sub-${idx}`).classList.toggle('d-none'); }
+
+  function exportarExcel() {
+    const wb = XLSX.utils.book_new();
+    const dataFiltrada = dataGlobal.filter(i => Object.keys(filtros).every(k => filtros[k].includes(i[k].toString())));
+    
+    let ws_data = [];
+    if (vistaActual === 'resumen') {
+      ws_data.push(["DIAMETRO", "ACERO", "ROLLOS", "KILOS"]);
+      let tR = 0, tK = 0;
+      // Lógica de agrupado rápida para exportar
+      const agg = {};
+      dataFiltrada.forEach(i => {
+        const k = i.diametro + "|" + i.aceroLimpio;
+        if(!agg[k]) agg[k] = {d:i.diametro, a:i.aceroLimpio, r:0, k:0};
+        agg[k].r++; agg[k].k += i.kilos;
+      });
+      Object.values(agg).forEach(g => { ws_data.push([g.d, g.a, g.r, g.k]); tR += g.r; tK += g.k; });
+      ws_data.push(["TOTALES", "", tR, tK]);
+    } else {
+      ws_data.push(["PROVEEDOR", "FECHA", "DIAMETRO", "ACERO", "N_ROLLO", "KILOS", "COLADA", "SELLO", "REMISION", "CONS."]);
+      let tK = 0;
+      dataFiltrada.forEach(i => {
+        ws_data.push([i.proveedor, i.fecha, i.diametro, i.aceroFull, i.n_rollo, i.kilos, i.colada, i.sello, i.n_remision, i.consecutivo]);
+        tK += i.kilos;
+      });
+      ws_data.push(["TOTAL REGISTROS:", dataFiltrada.length, "", "", "", tK, "", "", "", ""]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, "Export");
+    XLSX.writeFile(wb, `${document.getElementById('mainTitle').innerText} ${new Date().getTime()}.xlsx`);
+  }
+</script>
+</body>
+</html>

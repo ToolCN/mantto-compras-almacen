@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary: #1a237e;
+      --bg: #f0f4f8;
+      --danger: #d32f2f;
+      --success: #2e7d32;
+      --prio-baja: #03a9f4;
+      --prio-media: #fbc02d;
+      --prio-alta: #ff9800;
+      --prio-critica: #b71c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    /* html sin height fijo — solo sirve de contenedor */
+    html {
+      font-family: 'Roboto', sans-serif;
+      background: var(--bg);
+      margin: 0; padding: 0;
+    }
+    /* body crece con el contenido y el scroll es suyo */
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: var(--bg);
+      margin: 0; padding: 0;
+      min-height: 100vh;
+      /* scroll nativo fluido — crítico en iOS Safari y Android Chrome */
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      -webkit-tap-highlight-color: transparent;
+      /* Evita que eventos de toque sean capturados por elementos hijos incorrectamente */
+      touch-action: pan-y;
+    }
+
+    /* ══ OVERLAY / LOADING ══ */
+    #overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.98); z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    }
+    .spinner {
+      border: 6px solid #f3f3f3; border-top: 6px solid var(--primary);
+      border-radius: 50%; width: 50px; height: 50px;
+      animation: spin 1s linear infinite; margin-bottom: 15px;
+    }
+    @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+
+    /* ══ LOGIN SCREEN ══ */
+    #login-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #0f172a, #1e3a5f);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9998; padding: 20px;
+    }
+    .login-card {
+      background: white; padding: 2.5rem; border-radius: 20px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: center;
+    }
+    .login-field {
+      display: flex; align-items: center;
+      background: #f1f5f9; border-radius: 10px; margin-bottom: 12px;
+      overflow: hidden; border: 2px solid transparent; transition: .2s;
+    }
+    .login-field:focus-within { border-color: var(--primary); background: white; }
+    .login-field i { padding: 0 14px; color: #94a3b8; font-size: 15px; }
+    .login-field input {
+      flex: 1; padding: 13px 10px 13px 0; border: none; background: transparent;
+      font-size: 15px; outline: none; font-family: 'Roboto', sans-serif;
+    }
+    #login-error {
+      display: none; background: #fee2e2; color: #b91c1c;
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+      font-size: 13px; font-weight: 600;
+    }
+    .btn-login {
+      width: 100%; padding: 15px; border: none; border-radius: 10px;
+      background: var(--primary); color: white; font-size: 16px;
+      font-weight: 900; cursor: pointer; transition: .2s;
+    }
+    .btn-login:hover { background: #283593; }
+    /* Autocomplete */
+    .ac-wrap { position: relative; }
+    .ac-list {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: white; border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.15); z-index: 200;
+      max-height: 200px; overflow-y: auto; display: none;
+      border: 1px solid #e2e8f0; margin-top: 4px;
+    }
+    .ac-item {
+      padding: 10px 14px; cursor: pointer; font-size: 14px;
+      font-weight: 600; color: #0f172a; transition: .15s;
+    }
+    .ac-item:hover, .ac-item.selected { background: #eff6ff; color: #1d4ed8; }
+
+    /* ══ SUCCESS SCREEN ══ */
+    #success-content { display: none; flex-direction: column; align-items: center; }
+    .btn-final {
+      width: 260px; padding: 16px; border: none; border-radius: 12px;
+      font-weight: 900; cursor: pointer; margin-top: 12px;
+      font-size: 15px; text-transform: uppercase;
+    }
+
+    /* ══ CONTAINER PRINCIPAL ══ */
+    .container {
+      max-width: 520px; margin: auto; background: white;
+      padding: 0; border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      position: relative;
+      /* Sin overflow:hidden para no bloquear scroll ni touch */
+    }
+
+    /* BORDE DE PRIORIDAD (margen de color) */
+    .container.prio-Baja     { border: 5px solid var(--prio-baja); }
+    .container.prio-Media    { border: 5px solid var(--prio-media); }
+    .container.prio-Alta     { border: 5px solid var(--prio-alta); }
+    .container.prio-Critica  { border: 5px solid var(--prio-critica); }
+
+    /* ══ HEADER DE FORM ══ */
+    .form-header {
+      padding: 14px 16px 10px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #eee;
+      background: #fafafa;
+    }
+    .user-badge-wrap {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 5px; max-width: 48%;
+    }
+    .user-badge {
+      background: #e8eaf6; border-radius: 8px; padding: 6px 12px;
+      font-size: 12px; font-weight: 900; color: var(--primary);
+      display: flex; align-items: center; gap: 6px; width: 100%;
+    }
+    .user-badge i { font-size: 13px; }
+    .btn-mis-solicitudes {
+      background: none; border: 1.5px solid var(--primary); border-radius: 7px;
+      color: var(--primary); font-size: 10px; font-weight: 900;
+      padding: 4px 9px; cursor: pointer; letter-spacing: .03em;
+      text-transform: uppercase; display: flex; align-items: center; gap: 5px;
+      touch-action: manipulation; transition: .15s; white-space: nowrap;
+    }
+    .btn-mis-solicitudes:active { background: #e8eaf6; }
+
+    /* ══ BOTONES TIPO ORDEN (OM / OT / OH) ══ */
+    .tipo-orden-group {
+      display: flex; gap: 6px;
+    }
+    .btn-tipo {
+      padding: 16px 14px; border: 2px solid #ddd; border-radius: 12px;
+      background: white; font-size: 15px; font-weight: 900;
+      cursor: pointer; transition: .2s; color: #555;
+      min-width: 60px; min-height: 74px;
+      text-align: center; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation;
+    }
+    .btn-tipo.active-OM { border-color: #1a237e; background: #1a237e; color: white; }
+    .btn-tipo.active-OT { border-color: #00695c; background: #00695c; color: white; }
+    .btn-tipo.active-OH { border-color: #b71c1c; background: #b71c1c; color: white; }
+    .tipo-nombre {
+      font-size: 10px; font-weight: 900; text-align: center;
+      margin-top: 4px; color: #333; text-transform: uppercase; letter-spacing: .02em;
+    }
+
+
+    /* ══ VISTA MIS SOLICITUDES ══ */
+    #vistaSolicitudes {
+      display: none;
+      position: fixed; inset: 0; z-index: 9990;
+      background: var(--bg);
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+    }
+    .sol-header {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--primary); color: white;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .sol-header h2 { margin: 0; font-size: 16px; font-weight: 900; flex: 1; }
+    .sol-back {
+      background: rgba(255,255,255,.15); border: none; color: white;
+      border-radius: 8px; padding: 7px 12px; font-size: 13px;
+      font-weight: 900; cursor: pointer; touch-action: manipulation;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .sol-back:active { background: rgba(255,255,255,.3); }
+    .sol-body { padding: 14px 12px; max-width: 600px; margin: auto; }
+    .sol-count {
+      font-size: 12px; color: #555; font-weight: 700;
+      margin-bottom: 12px; padding: 0 2px;
+    }
+    /* Tarjeta por orden */
+    .sol-card {
+      background: white; border-radius: 14px; margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      overflow: hidden;
+    }
+    .sol-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .sol-folio {
+      font-size: 15px; font-weight: 900; color: var(--primary); letter-spacing: .5px;
+    }
+    .sol-fecha { font-size: 11px; color: #888; font-weight: 600; }
+    .sol-badge-estado {
+      font-size: 10px; font-weight: 900; padding: 4px 10px;
+      border-radius: 20px; text-transform: uppercase; white-space: nowrap;
+    }
+    .estado-abierta   { background: #e3f2fd; color: #1565c0; }
+    .estado-proceso   { background: #fff8e1; color: #f57f17; }
+    .estado-terminada { background: #e8f5e9; color: #2e7d32; }
+    .estado-cerrada   { background: #f3e5f5; color: #6a1b9a; }
+    .estado-cancelada { background: #fce4ec; color: #b71c1c; }
+    .estado-otro      { background: #f5f5f5; color: #555; }
+    /* Tabla de detalles */
+    .sol-tabla { width: 100%; border-collapse: collapse; }
+    .sol-tabla td {
+      padding: 7px 14px; font-size: 12px; vertical-align: top;
+      border-bottom: 1px solid #f7f7f7;
+    }
+    .sol-tabla td:first-child {
+      font-weight: 900; color: #888; text-transform: uppercase;
+      font-size: 10px; width: 90px; white-space: nowrap; padding-top: 9px;
+    }
+    .sol-tabla td:last-child { color: #222; font-weight: 600; }
+    .sol-tabla tr:last-child td { border-bottom: none; }
+    /* Badge prioridad dentro de tabla */
+    .prio-chip {
+      display: inline-block; font-size: 10px; font-weight: 900;
+      padding: 2px 8px; border-radius: 20px;
+    }
+    .prio-critica { background: #ffebee; color: #b71c1c; }
+    .prio-alta    { background: #fff3e0; color: #e65100; }
+    .prio-media   { background: #fffde7; color: #f57f17; }
+    .prio-baja-ch { background: #e3f2fd; color: #1565c0; }
+    /* Sin resultados */
+    .sol-empty {
+      text-align: center; padding: 50px 20px; color: #aaa;
+    }
+    .sol-empty i { font-size: 40px; margin-bottom: 12px; display: block; }
+    .sol-empty p { font-size: 14px; font-weight: 600; margin: 0; }
+    /* Spinner dentro del panel */
+    .sol-loading {
+      text-align: center; padding: 60px 20px; color: #888;
+    }
+
+    /* ══ FORM BODY ══ */
+    .form-body { padding: 14px 16px; }
+    .form-group { margin-bottom: 14px; }
+    label {
+      font-size: 10px; font-weight: 900; color: #666;
+      display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em;
+    }
+    .form-control {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px solid #e0e0e0; border-radius: 10px;
+      font-size: 15px; transition: .2s; font-family: 'Roboto', sans-serif;
+      background: white;
+    }
+    .form-control:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(26,35,126,.1); }
+
+    /* ══ FOLIO DISPLAY ══ */
+    .folio-box {
+      background: #fff8e1; border: 2px solid #f9a825;
+      border-radius: 10px; padding: 10px 14px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .folio-label { font-size: 10px; font-weight: 900; color: #f57f17; text-transform: uppercase; }
+    .folio-value { font-size: 20px; font-weight: 900; color: #e65100; letter-spacing: 1px; }
+
+    /* ══ INPUT TIPO BOTÓN (para Área y Máquina) ══ */
+    .input-btn {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px dashed #bbb; border-radius: 10px;
+      background: #fafafa; font-size: 15px; text-align: left;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: space-between; transition: .2s;
+    }
+    .input-btn:hover { border-color: var(--primary); background: #f3f4ff; }
+    .input-btn span { flex: 1; }
+    .input-btn .placeholder-txt { color: #aaa; font-style: italic; }
+    .input-btn i { color: #aaa; font-size: 14px; }
+
+    /* ══ CHECKS TIPO REQUERIMIENTO ══ */
+    .checks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px; }
+    .check-item {
+      font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px;
+      background: #f9f9f9; border: 1.5px solid #eee; border-radius: 8px; padding: 9px 10px;
+      cursor: pointer; transition: .15s;
+    }
+    .check-item input { width: 17px; height: 17px; cursor: pointer; accent-color: var(--primary); }
+    .check-item:has(input:checked) { background: #e8eaf6; border-color: var(--primary); }
+
+    /* ══ PRIORIDAD BOTONES ══ */
+    .prio-group { display: flex; gap: 8px; margin-top: 5px; }
+    .btn-prio {
+      flex: 1; padding: 10px 5px; border: 2px solid transparent;
+      border-radius: 10px; font-size: 12px; font-weight: 900;
+      cursor: pointer; transition: .2s; text-align: center;
+      opacity: 0.55;
+    }
+    .btn-prio.prio-baja   { background: #e3f2fd; border-color: var(--prio-baja); color: #01579b; }
+    .btn-prio.prio-media  { background: #fffde7; border-color: var(--prio-media); color: #f57f17; }
+    .btn-prio.prio-alta   { background: #fff3e0; border-color: var(--prio-alta); color: #e65100; }
+    .btn-prio.prio-critica{ background: #ffebee; border-color: var(--prio-critica); color: #b71c1c; }
+    .btn-prio.active { opacity: 1; transform: scale(1.04); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+
+    /* ══ MÁQUINA PARADA ══ */
+    #btnTM {
+      width: 100%; padding: 13px; border: none; border-radius: 10px;
+      font-weight: 900; color: white; cursor: pointer; font-size: 15px; margin-top: 5px;
+    }
+    .tm-no { background: var(--success); }
+    .tm-si { background: var(--danger); }
+
+    /* ══ BOTÓN ADJUNTAR FOTO ══ */
+    .btn-adjuntar {
+      width: 100%; padding: 14px; border: 2px dashed #90caf9;
+      border-radius: 12px; background: #e3f2fd; color: #1565c0;
+      font-size: 14px; font-weight: 900; cursor: pointer; transition: .2s;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-adjuntar:hover { background: #bbdefb; border-color: #1565c0; }
+    .btn-adjuntar i { font-size: 20px; }
+    .foto-preview-area {
+      display: none; margin-top: 10px;
+      border-radius: 10px; overflow: hidden; position: relative;
+    }
+    .foto-preview-area img { width: 100%; border-radius: 10px; display: block; }
+    .btn-quitar-foto {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,.6); color: white; border: none;
+      border-radius: 50%; width: 30px; height: 30px; cursor: pointer;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+    }
+    #fotoEstado { font-size: 12px; color: #1565c0; font-weight: 700; margin-top: 6px; text-align: center; }
+
+    /* ══ BOTÓN GUARDAR ══ */
+    .btn-guardar {
+      width: 100%; padding: 16px; border: none; border-radius: 12px;
+      background: var(--primary); color: white; font-size: 16px;
+      font-weight: 900; cursor: pointer; transition: .2s;
+      margin-top: 6px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-guardar:active { transform: scale(.98); }
+
+    /* ══ MODAL ÁREA ══ */
+    .modal-fullscreen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: white; z-index: 100000;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      display: flex; flex-direction: column;
+    }
+    .modal-header-custom {
+      position: sticky; top: 0; background: var(--primary); color: white;
+      padding: 16px 20px; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 4px 10px rgba(0,0,0,.2);
+    }
+    .modal-header-custom h3 { margin: 0; font-size: 17px; font-weight: 900; }
+    .modal-search {
+      padding: 12px 16px; background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0; position: sticky; top: 60px; z-index: 9;
+    }
+    .modal-search input {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #ddd;
+      border-radius: 10px; font-size: 15px; outline: none;
+    }
+    .modal-search input:focus { border-color: var(--primary); }
+    .modal-body-custom { padding: 12px 16px; flex: 1; }
+    .grupo-header {
+      background: var(--primary); color: white; padding: 10px 14px;
+      font-weight: 900; margin: 14px 0 6px; border-radius: 8px; font-size: 12px;
+      letter-spacing: .05em; text-transform: uppercase;
+    }
+    .item-card {
+      display: block; width: 100%; padding: 14px 16px; margin: 5px 0;
+      border: 1.5px solid #e0e0e0; border-radius: 10px;
+      background: #fff; text-align: left; font-size: 15px; font-weight: bold;
+      cursor: pointer; transition: .15s;
+    }
+    .item-card:hover { background: #f0f4ff; border-color: var(--primary); }
+    .btn-volver {
+      width: 100%; padding: 15px; background: #e8eaf6; border: none;
+      border-radius: 10px; font-weight: 900; font-size: 15px; cursor: pointer; margin-top: 10px;
+    }
+
+    /* ══ TICKET OCULTO ══ */
+    #ticket-container { position: absolute; left: -9999px; }
+    #ticket-preview { width: 450px; background: white; position: relative; box-sizing: border-box; }
+    .prio-banner { text-align: center; font-weight: 900; padding: 12px; font-size: 16px; text-transform: uppercase; }
+
+    .prio-Critica { border: 20px solid #b71c1c; } .prio-Critica .prio-banner { background: #b71c1c; color: #fff; }
+    .prio-Alta    { border: 18px solid #ff9800; } .prio-Alta    .prio-banner { background: #ff9800; color: #fff; }
+    .prio-Media   { border: 18px solid #fbc02d; } .prio-Media   .prio-banner { background: #fbc02d; color: #000; }
+    .prio-Baja    { border: 18px solid #03a9f4; } .prio-Baja    .prio-banner { background: #03a9f4; color: #000; }
+
+    .ticket-body { padding: 25px; color: #000; }
+    .falla-box { margin-top: 15px; border: 2px solid #000; padding: 15px; background: #f9f9f9; }
+
+    /* ══ RESPONSIVE PEQUEÑO ══ */
+    @media(max-width:380px) {
+      .btn-tipo { font-size: 12px; padding: 10px 7px; min-width: 42px; min-height: 48px; }
+      .btn-prio { font-size: 11px; padding: 9px 4px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ OVERLAY ══════════ -->
+<div id="overlay">
+  <div id="loading-ui">
+    <div class="spinner"></div>
+    <h2 id="overlay-text" style="color:var(--primary); margin:0;">Cargando...</h2>
+    <p id="overlay-subtext" style="color:#666; margin-top:5px;">Por favor espere</p>
+  </div>
+  <div id="success-content">
+    <div style="background:#e8f5e9; width:70px; height:70px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:15px;">
+      <h1 style="color:var(--success); font-size:40px; margin:0;">✔</h1>
+    </div>
+    <h2 style="color:var(--primary); margin:0;">¡NOTIFICADO CON ÉXITO!</h2>
+    <p id="success-folio" style="font-size:20px; font-weight:900; color:#e65100; margin:10px 0;"></p>
+    <button class="btn-final" style="background:var(--success); color:white" onclick="nuevaOrden()">Generar Nueva Orden</button>
+    <button class="btn-final" style="background:#333; color:white" onclick="window.top.close();">Cerrar Pestaña</button>
+  </div>
+</div>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" width="160" style="margin-bottom:20px;">
+    <h4 style="font-weight:900; color:#0f172a; margin-bottom:5px;">Bienvenido</h4>
+    <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Ingresa tus credenciales para reportar una orden</p>
+    <div id="login-error"><i class="fas fa-exclamation-circle"></i> <span id="login-error-txt">Error</span></div>
+    <div class="ac-wrap">
+      <div class="login-field">
+        <i class="fas fa-user"></i>
+        <input type="text" id="userInput" placeholder="Usuario..."
+          autocomplete="off" oninput="filtrarAC()" onkeydown="acKeydown(event)" onblur="setTimeout(cerrarAC,200)">
+      </div>
+      <div class="ac-list" id="acList"></div>
+    </div>
+    <div class="login-field">
+      <i class="fas fa-lock"></i>
+      <input type="password" id="passInput" placeholder="Contraseña"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-login" onclick="doLogin()"><i class="fas fa-sign-in-alt" style="margin-right:8px;"></i>INICIAR SESIÓN</button>
+  </div>
+</div>
+
+<!-- ══════════ FORMULARIO PRINCIPAL ══════════ -->
+<div style="padding:14px; padding-bottom:40px; touch-action: pan-y;">
+<div class="container" id="formContainer">
+
+  <!-- HEADER -->
+  <div class="form-header">
+    <!-- Usuario (esquina izq) -->
+    <div class="user-badge-wrap">
+      <div class="user-badge" id="userBadge">
+        <i class="fas fa-user-circle"></i>
+        <span id="labelUsuario">...</span>
+      </div>
+      <button class="btn-mis-solicitudes" onclick="verMisSolicitudes()">
+        <i class="fas fa-list-alt"></i> Mis Solicitudes
+      </button>
+    </div>
+
+    <!-- Tipo de orden (esquina der) + botón salir -->
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
+      <button onclick="cerrarSesion()"
+        style="background:none; border:none; color:#e53935; font-size:11px; font-weight:900;
+        cursor:pointer; padding:0; display:flex; align-items:center; gap:4px; text-transform:uppercase; letter-spacing:.03em;">
+        <i class="fas fa-sign-out-alt"></i> Salir
+      </button>
+      <div class="tipo-orden-group">
+        <button class="btn-tipo active-OM" id="btnOM" onclick="setTipoOrden('OM')">OM</button>
+        <button class="btn-tipo"           id="btnOT" onclick="setTipoOrden('OT')">OT</button>
+        <button class="btn-tipo"           id="btnOH" onclick="setTipoOrden('OH')">OH</button>
+      </div>
+      <div class="tipo-nombre" id="labelTipoOrden">ORDEN DE MANTENIMIENTO</div>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="form-body">
+
+    <!-- FOLIO -->
+    <div class="form-group">
+      <label><i class="fas fa-hashtag"></i> Folio</label>
+      <div class="folio-box">
+        <span class="folio-label">Número asignado</span>
+        <span class="folio-value" id="inpFolio">OM-0001</span>
+      </div>
+    </div>
+
+    <!-- ÁREA -->
+    <div class="form-group">
+      <label><i class="fas fa-map-marker-alt"></i> Área / Proceso</label>
+      <button class="input-btn" onclick="abrirModalAreas()">
+        <span id="btnAreaTxt" class="placeholder-txt">Toque para seleccionar área...</span>
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+
+    <!-- MÁQUINA -->
+    <div class="form-group">
+      <label><i class="fas fa-cog"></i> Máquina</label>
+      <button class="input-btn" onclick="abrirModalMaquinas()">
+        <span id="btnMaquinaTxt" class="placeholder-txt">Seleccione área primero...</span>
+        <i class="fas fa-search"></i>
+      </button>
+    </div>
+
+    <!-- TIPO REQUERIMIENTO -->
+    <div class="form-group">
+      <label><i class="fas fa-tools"></i> Tipo de Requerimiento</label>
+      <div id="checksTipo" class="checks-grid"></div>
+    </div>
+
+    <!-- PRIORIDAD -->
+    <div class="form-group">
+      <label><i class="fas fa-exclamation-triangle"></i> Prioridad</label>
+      <div class="prio-group">
+        <button class="btn-prio prio-baja"    id="prio-Baja"    onclick="setPrioridad('Baja')">🔵<br>BAJA</button>
+        <button class="btn-prio prio-media"   id="prio-Media"   onclick="setPrioridad('Media')">🟡<br>MEDIA</button>
+        <button class="btn-prio prio-alta"    id="prio-Alta"    onclick="setPrioridad('Alta')">🟠<br>ALTA</button>
+        <button class="btn-prio prio-critica" id="prio-Critica" onclick="setPrioridad('Critica')">🔴<br>CRÍTICA</button>
+      </div>
+    </div>
+
+    <!-- REPORTE FALLA -->
+    <div class="form-group">
+      <label><i class="fas fa-comment-alt"></i> Reporte de Falla</label>
+      <textarea id="inpFalla" class="form-control" rows="3"
+        style="text-transform:uppercase; resize:none;"
+        placeholder="DESCRIBA EL PROBLEMA DETALLADAMENTE..."></textarea>
+    </div>
+
+    <!-- MÁQUINA PARADA -->
+    <div class="form-group">
+      <label><i class="fas fa-stop-circle"></i> ¿Máquina Parada?</label>
+      <button id="btnTM" class="tm-no" onclick="toggleTM()">✅ NO — MÁQUINA EN OPERACIÓN</button>
+    </div>
+
+    <!-- ADJUNTAR FOTO -->
+    <div class="form-group">
+      <label><i class="fas fa-camera"></i> Foto / Evidencia</label>
+
+      <!-- Inputs reales — DEBEN estar en el DOM antes que los labels -->
+      <!-- Sin capture → galería/explorador de archivos -->
+      <input type="file" id="inputFoto"       accept="image/*"
+        style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"
+        onchange="previsualizarFoto(event)">
+      <!-- capture="environment" → cámara trasera directamente -->
+      <input type="file" id="inputFotoCamara" accept="image/*" capture="environment"
+        style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"
+        onchange="previsualizarFoto(event)">
+
+      <!-- Botón principal que abre el mini-menú -->
+      <button class="btn-adjuntar" id="btnAbrirFoto" onclick="abrirSeleccionFoto()">
+        <i class="fas fa-camera"></i>
+        <span id="fotoTxtBtn">TOMAR FOTO O ADJUNTAR ARCHIVO</span>
+      </button>
+
+      <div class="foto-preview-area" id="fotoPreviewArea">
+        <img id="fotoPreviewImg" src="" alt="Vista previa">
+        <button class="btn-quitar-foto" onclick="quitarFoto()"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="fotoEstado"></div>
+    </div>
+
+    <!-- GUARDAR -->
+    <button class="btn-guardar" onclick="guardarTodo()">
+      <i class="fas fa-paper-plane"></i> GUARDAR Y ENVIAR
+    </button>
+
+  </div><!-- /form-body -->
+</div><!-- /container -->
+</div><!-- /padding -->
+
+<!-- ══════════ MODALES ══════════ -->
+
+<!-- Modal de Área (pantalla completa) -->
+<div id="modalAreas" class="modal-fullscreen" style="display:none;">
+  <div class="modal-header-custom">
+    <h3><i class="fas fa-map-marker-alt" style="margin-right:8px;"></i>Seleccionar Área</h3>
+    <button onclick="document.getElementById('modalAreas').style.display='none'"
+      style="background:rgba(255,255,255,.2); border:none; color:white; border-radius:8px; padding:8px 14px; font-weight:900; cursor:pointer;">
+      ✕ Cerrar
+    </button>
+  </div>
+  <div class="modal-search">
+    <input type="text" id="searchArea" placeholder="🔍 Buscar área..." oninput="filtrarAreas()">
+  </div>
+  <div class="modal-body-custom" id="listaAreas"></div>
+</div>
+
+<!-- Modal de Máquina (pantalla completa) -->
+<div id="modalMaquinas" class="modal-fullscreen" style="display:none;">
+  <div class="modal-header-custom">
+    <h3><i class="fas fa-cog" style="margin-right:8px;"></i>Seleccionar Máquina</h3>
+    <button onclick="document.getElementById('modalMaquinas').style.display='none'"
+      style="background:rgba(255,255,255,.2); border:none; color:white; border-radius:8px; padding:8px 14px; font-weight:900; cursor:pointer;">
+      ✕ Cerrar
+    </button>
+  </div>
+  <div class="modal-search">
+    <input type="text" id="searchMaq" placeholder="🔍 Buscar máquina..." oninput="filtrarMaquinas()">
+  </div>
+  <div class="modal-body-custom" id="listaMaquinas"></div>
+</div>
+
+<!-- Modal selección foto / cámara -->
+<!-- IMPORTANTE: Los <label> apuntan con for= directamente a los inputs.
+     Esto es la única forma 100% confiable en móviles (iOS Safari y Android Chrome).
+     El navegador interpreta el toque en el label como un toque directo al input,
+     lo cual es necesario para abrir la cámara o el explorador de archivos. -->
+<div id="modalFoto" style="display:none; position:fixed; inset:0; z-index:100001;
+  background:rgba(0,0,0,.55); align-items:flex-end;">
+  <div style="width:100%; background:white; border-radius:22px 22px 0 0; overflow:hidden;
+    box-shadow: 0 -8px 30px rgba(0,0,0,.25);">
+
+    <!-- Título -->
+    <div style="padding:16px 20px 12px; font-weight:900; font-size:15px;
+      border-bottom:1px solid #eee; text-align:center; color:#333;">
+      <i class="fas fa-camera" style="margin-right:8px; color:var(--primary);"></i>
+      Adjuntar Evidencia
+    </div>
+
+    <!-- OPCIÓN 1: CÁMARA — label apunta a inputFotoCamara (capture=environment) -->
+    <label for="inputFotoCamara"
+      onclick="document.getElementById('modalFoto').style.display='none'"
+      style="display:flex; align-items:center; gap:14px; width:100%; padding:18px 24px;
+      border:none; background:white; font-size:16px; font-weight:700; cursor:pointer;
+      border-bottom:1px solid #f0f0f0; color:#1565c0;">
+      <span style="width:40px; height:40px; background:#e3f2fd; border-radius:50%;
+        display:flex; align-items:center; justify-content:center;">
+        <i class="fas fa-camera" style="font-size:18px;"></i>
+      </span>
+      <div>
+        <div>Tomar Foto con Cámara</div>
+        <div style="font-size:12px; font-weight:400; color:#90a4ae; margin-top:2px;">Abre la cámara directamente</div>
+      </div>
+    </label>
+
+    <!-- OPCIÓN 2: GALERÍA — label apunta a inputFoto (sin capture) -->
+    <label for="inputFoto"
+      onclick="document.getElementById('modalFoto').style.display='none'"
+      style="display:flex; align-items:center; gap:14px; width:100%; padding:18px 24px;
+      border:none; background:white; font-size:16px; font-weight:700; cursor:pointer;
+      border-bottom:1px solid #f0f0f0; color:#2e7d32;">
+      <span style="width:40px; height:40px; background:#e8f5e9; border-radius:50%;
+        display:flex; align-items:center; justify-content:center;">
+        <i class="fas fa-images" style="font-size:18px;"></i>
+      </span>
+      <div>
+        <div>Seleccionar de Galería / Archivo</div>
+        <div style="font-size:12px; font-weight:400; color:#90a4ae; margin-top:2px;">Busca en tus fotos o archivos</div>
+      </div>
+    </label>
+
+    <!-- CANCELAR -->
+    <button onclick="document.getElementById('modalFoto').style.display='none'"
+      style="display:block; width:100%; padding:16px; border:none;
+      background:#fafafa; font-size:15px; font-weight:900; color:#e53935; cursor:pointer;
+      letter-spacing:.05em;">
+      CANCELAR
+    </button>
+
+  </div>
+</div>
+
+<!-- ══════════ TICKET OCULTO PARA TELEGRAM ══════════ -->
+<div id="ticket-container">
+  <div id="ticket-preview">
+    <div class="prio-banner" id="t-banner-top"></div>
+    <div class="ticket-body">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #000; padding-bottom:12px;">
+        <img src="https://www.toolcn.mx/cdn/shop/files/logo_ToolCN_shopify.png?v=1751677238" width="110">
+        <div style="text-align:right">
+          <small style="font-weight:900">CLAVOS NACIONALES CN SA DE CV</small><br>
+          <b id="t-folio" style="font-size:26px; color:red;"></b><br>
+          <small id="t-fecha" style="font-weight:bold"></small>
+        </div>
+      </div>
+      <div style="margin-top:20px; font-size:18px;">
+        <div>📍 ÁREA: <b id="t-area"></b></div>
+        <div>⚙️ MÁQUINA: <b id="t-maquina"></b></div>
+        <div>⚠️ PARO: <b id="t-tm"></b></div>
+        <div>👤 USUARIO: <b id="t-usuario"></b></div>
+        <div style="margin-top:5px; font-size:14px;">🛠 TIPO: <span id="t-tipo"></span></div>
+        <div class="falla-box">
+          <small style="font-size:10px; font-weight:900; color:#555;">REPORTE TÉCNICO:</small><br>
+          <b id="t-falla" style="font-size:20px; line-height:1.2; text-transform:uppercase;"></b>
+        </div>
+        <!-- Foto de evidencia (solo aparece si se adjuntó una) -->
+        <div id="t-foto-wrap" style="display:none; margin-top:15px; border:2px solid #000;">
+          <div style="background:#000; color:white; font-size:10px; font-weight:900; padding:5px 10px;">📷 FOTO DE EVIDENCIA</div>
+          <img id="t-foto-img" src="" style="width:100%; display:block; max-height:300px; object-fit:cover;">
+        </div>
+      </div>
+    </div>
+    <div class="prio-banner" id="t-banner-bottom"></div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL CAMBIO DE CONTRASEÑA ══════════ -->
+<!-- Se muestra cuando el usuario tiene contraseña "1234" (contraseña débil por defecto) -->
+<div id="modalCambioPass"
+  style="display:none; position:fixed; inset:0; z-index:99998;
+  background:rgba(0,0,0,.7); align-items:center; justify-content:center; padding:20px;">
+  <div style="background:white; border-radius:20px; padding:28px 24px;
+    width:100%; max-width:380px; box-shadow:0 20px 50px rgba(0,0,0,.4);">
+
+    <!-- Ícono + título -->
+    <div style="text-align:center; margin-bottom:20px;">
+      <div style="width:60px; height:60px; background:#fff3e0; border-radius:50%;
+        margin:0 auto 12px; display:flex; align-items:center; justify-content:center;">
+        <i class="fas fa-lock" style="font-size:26px; color:#e65100;"></i>
+      </div>
+      <h3 style="margin:0; color:#1a237e; font-size:18px; font-weight:900;">Cambia tu Contraseña</h3>
+      <p style="margin:8px 0 0; color:#666; font-size:13px; line-height:1.4;">
+        Tu contraseña es la predeterminada.<br>
+        <b>Debes cambiarla antes de continuar.</b>
+      </p>
+    </div>
+
+    <!-- Mensaje de error -->
+    <div id="errCambioPass"
+      style="display:none; background:#fee2e2; color:#b91c1c; border-radius:8px;
+      padding:9px 12px; margin-bottom:14px; font-size:13px; font-weight:600;">
+    </div>
+
+    <!-- Nueva contraseña -->
+    <div style="margin-bottom:12px;">
+      <label style="font-size:10px; font-weight:900; color:#666; text-transform:uppercase;
+        letter-spacing:.05em; display:block; margin-bottom:5px;">Nueva Contraseña</label>
+      <div style="display:flex; align-items:center; background:#f1f5f9; border-radius:10px;
+        border:2px solid transparent; transition:.2s;" id="wrapNewPass"
+        onfocusin="this.style.borderColor='#1a237e'; this.style.background='white';"
+        onfocusout="this.style.borderColor='transparent'; this.style.background='#f1f5f9';">
+        <input type="password" id="inputNewPass" placeholder="Mínimo 4 caracteres"
+          style="flex:1; padding:13px 14px; border:none; background:transparent;
+          font-size:15px; outline:none; font-family:'Roboto',sans-serif;">
+        <span onclick="toggleVerPass('inputNewPass','eyeNew')"
+          style="padding:0 14px; cursor:pointer; color:#94a3b8; font-size:14px;">
+          <i id="eyeNew" class="fas fa-eye"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Confirmar contraseña -->
+    <div style="margin-bottom:20px;">
+      <label style="font-size:10px; font-weight:900; color:#666; text-transform:uppercase;
+        letter-spacing:.05em; display:block; margin-bottom:5px;">Confirmar Contraseña</label>
+      <div style="display:flex; align-items:center; background:#f1f5f9; border-radius:10px;
+        border:2px solid transparent; transition:.2s;" id="wrapConfPass"
+        onfocusin="this.style.borderColor='#1a237e'; this.style.background='white';"
+        onfocusout="this.style.borderColor='transparent'; this.style.background='#f1f5f9';">
+        <input type="password" id="inputConfPass" placeholder="Repite la contraseña"
+          style="flex:1; padding:13px 14px; border:none; background:transparent;
+          font-size:15px; outline:none; font-family:'Roboto',sans-serif;"
+          onkeydown="if(event.key==='Enter')guardarNuevaPass()">
+        <span onclick="toggleVerPass('inputConfPass','eyeConf')"
+          style="padding:0 14px; cursor:pointer; color:#94a3b8; font-size:14px;">
+          <i id="eyeConf" class="fas fa-eye"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- Botón guardar -->
+    <button id="btnGuardarPass" onclick="guardarNuevaPass()"
+      style="width:100%; padding:15px; border:none; border-radius:12px;
+      background:#1a237e; color:white; font-size:15px; font-weight:900; cursor:pointer;">
+      <i class="fas fa-save" style="margin-right:8px;"></i>GUARDAR CONTRASEÑA
+    </button>
+
+  </div>
+</div>
+
+
+<!-- ══════════ VISTA: MIS SOLICITUDES ══════════ -->
+<div id="vistaSolicitudes">
+  <div class="sol-header">
+    <button class="sol-back" onclick="cerrarMisSolicitudes()">
+      <i class="fas fa-arrow-left"></i> Volver
+    </button>
+    <h2><i class="fas fa-list-alt" style="margin-right:8px;"></i>Mis Solicitudes</h2>
+  </div>
+  <div class="sol-body">
+    <div id="solContenido">
+      <div class="sol-loading">
+        <div class="spinner" style="margin:0 auto 12px;"></div>
+        Cargando...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  VARIABLES GLOBALES
+// ══════════════════════════════════════════════════════
+let usersDB = [];
+let catalogo = [];
+let procesos = [];
+let tipoActual = 'OM';
+let prioActual = 'Media';
+let usuarioActual = '';
+let fotoBase64 = null;
+let _acSelectedUser = null;
+
+// ══════════════════════════════════════════════════════
+//  INICIALIZACIÓN
+// ══════════════════════════════════════════════════════
+window.onload = () => {
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('overlay-text').textContent = 'Cargando...';
+
+  // Siempre cargamos usuarios frescos del servidor (para verificar contraseña actualizada)
+  google.script.run
+    .withSuccessHandler(u => {
+      usersDB = u || [];
+
+      // Cargar catálogos
+      google.script.run
+        .withSuccessHandler(res => {
+          catalogo = res.maquinas || [];
+          procesos = res.procesos || [];
+          setPrioridad('Media');
+          renderChecksTipo();
+          document.getElementById('overlay').style.display = 'none';
+
+          // ── Revisar si hay sesión guardada ──
+          const sesionGuardada = localStorage.getItem('ot_session');
+          if (sesionGuardada) {
+            try {
+              const sess = JSON.parse(sesionGuardada);
+              // Verificar que el usuario sigue existiendo en el servidor
+              const userFresh = usersDB.find(x => x.nombre === sess.nombre);
+              if (userFresh) {
+                // Si la contraseña actual es aún "1234", forzar cambio
+                if (userFresh.password === '1234') {
+                  usuarioActual = userFresh.nombre;
+                  document.getElementById('overlay').style.display = 'none';
+                  abrirModalCambioPass();
+                  return;
+                }
+                // Sesión válida → entrar directo
+                iniciarApp(sess.nombre);
+                return;
+              }
+            } catch(e) {
+              localStorage.removeItem('ot_session');
+            }
+          }
+          // Sin sesión válida → mostrar login
+          document.getElementById('login-screen').style.display = 'flex';
+        })
+        .withFailureHandler(err => {
+          document.getElementById('overlay').style.display = 'none';
+          alert('Error al cargar catálogos: ' + err);
+        })
+        .getCatalogos();
+    })
+    .withFailureHandler(() => {
+      usersDB = [];
+      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+    })
+    .getUsuariosLogin();
+};
+
+// ══════════════════════════════════════════════════════
+//  LOGIN
+// ══════════════════════════════════════════════════════
+function filtrarAC() {
+  const q = (document.getElementById('userInput').value || '').trim().toUpperCase();
+  const list = document.getElementById('acList');
+  _acSelectedUser = null;
+  if (!q) { list.style.display = 'none'; list.innerHTML = ''; return; }
+  const matches = usersDB.filter(u => u.nombre.toUpperCase().includes(q));
+  if (!matches.length) { list.style.display = 'none'; list.innerHTML = ''; return; }
+  list.innerHTML = matches.map(u =>
+    `<div class="ac-item" data-nombre="${u.nombre}"
+      onmousedown="elegirUser('${u.nombre.replace(/'/g,"\\'")}')">${u.nombre}</div>`
+  ).join('');
+  list.style.display = 'block';
+  list.querySelectorAll('.ac-item')[0]?.classList.add('selected');
+}
+function elegirUser(nombre) {
+  _acSelectedUser = nombre;
+  document.getElementById('userInput').value = nombre;
+  document.getElementById('acList').style.display = 'none';
+  setTimeout(() => document.getElementById('passInput').focus(), 50);
+}
+function cerrarAC() {
+  document.getElementById('acList').style.display = 'none';
+}
+function acKeydown(e) {
+  const list = document.getElementById('acList');
+  const items = list.querySelectorAll('.ac-item');
+  const sel = [...items].findIndex(i => i.classList.contains('selected'));
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (sel >= 0) items[sel].classList.remove('selected');
+    items[Math.min(sel + 1, items.length - 1)]?.classList.add('selected');
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (sel >= 0) items[sel].classList.remove('selected');
+    items[Math.max(sel - 1, 0)]?.classList.add('selected');
+  } else if (e.key === 'Enter') {
+    const selItem = list.querySelector('.ac-item.selected') || items[0];
+    if (selItem && list.style.display !== 'none') {
+      e.preventDefault();
+      elegirUser(selItem.dataset.nombre);
+    } else {
+      doLogin();
+    }
+  }
+}
+
+function doLogin() {
+  const nom = (document.getElementById('userInput').value || '').trim();
+  const pas = document.getElementById('passInput').value.trim();
+  const errEl = document.getElementById('login-error');
+  const errTxt = document.getElementById('login-error-txt');
+  errEl.style.display = 'none';
+
+  if (!nom) { errTxt.textContent = 'Escribe y selecciona un usuario.'; errEl.style.display = 'block'; return; }
+  const u = usersDB.find(x => x.nombre === nom);
+  if (!u) { errTxt.textContent = 'Usuario no encontrado.'; errEl.style.display = 'block'; return; }
+  if (u.password !== pas) {
+    errTxt.textContent = 'Contraseña incorrecta.';
+    errEl.style.display = 'block';
+    document.getElementById('passInput').value = '';
+    return;
+  }
+
+  // Guardar sesión
+  localStorage.setItem('ot_session', JSON.stringify({ nombre: u.nombre }));
+
+  // ── Si la contraseña es "1234" → forzar cambio antes de continuar ──
+  if (pas === '1234') {
+    usuarioActual = u.nombre; // necesario para que guardarNuevaPass sepa a quién actualizar
+    document.getElementById('login-screen').style.display = 'none';
+    abrirModalCambioPass();
+    return;
+  }
+
+  iniciarApp(u.nombre);
+}
+
+// Función separada para iniciar la app con un nombre de usuario ya validado
+function iniciarApp(nombre) {
+  usuarioActual = nombre;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('labelUsuario').textContent = usuarioActual;
+  cargarFolio();
+}
+
+// Cerrar sesión: borra el localStorage y muestra el login
+function cerrarSesion() {
+  if (!confirm('¿Cerrar sesión de ' + usuarioActual + '?')) return;
+  localStorage.removeItem('ot_session');
+  usuarioActual = '';
+  // Limpiar campos del login
+  document.getElementById('userInput').value = '';
+  document.getElementById('passInput').value = '';
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('acList').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// ══════════════════════════════════════════════════════
+//  CAMBIO DE CONTRASEÑA FORZADO (cuando es "1234")
+// ══════════════════════════════════════════════════════
+function abrirModalCambioPass() {
+  document.getElementById("inputNewPass").value = "";
+  document.getElementById("inputConfPass").value = "";
+  document.getElementById("errCambioPass").style.display = "none";
+  document.getElementById("modalCambioPass").style.display = "flex";
+}
+
+function toggleVerPass(inputId, iconId) {
+  const inp = document.getElementById(inputId);
+  const ico = document.getElementById(iconId);
+  if (inp.type === "password") { inp.type = "text"; ico.className = "fas fa-eye-slash"; }
+  else { inp.type = "password"; ico.className = "fas fa-eye"; }
+}
+
+function guardarNuevaPass() {
+  const nueva    = document.getElementById("inputNewPass").value.trim();
+  const confirma = document.getElementById("inputConfPass").value.trim();
+  const errEl    = document.getElementById("errCambioPass");
+  if (nueva.length < 4) { errEl.textContent = "❌ Mínimo 4 caracteres."; errEl.style.display = "block"; return; }
+  if (nueva === "1234")  { errEl.textContent = "❌ No puedes usar 1234 como contraseña."; errEl.style.display = "block"; return; }
+  if (nueva !== confirma){ errEl.textContent = "❌ Las contraseñas no coinciden."; errEl.style.display = "block"; return; }
+  errEl.style.display = "none";
+  const btn = document.getElementById("btnGuardarPass");
+  btn.disabled = true; btn.textContent = "Guardando...";
+  google.script.run
+    .withSuccessHandler(res => {
+      if (res === "OK") {
+        const u = usersDB.find(x => x.nombre === usuarioActual);
+        if (u) u.password = nueva;
+        document.getElementById("modalCambioPass").style.display = "none";
+        iniciarApp(usuarioActual);
+      } else {
+        errEl.textContent = "❌ Error: " + res; errEl.style.display = "block";
+        btn.disabled = false; btn.innerHTML = "<i class=\"fas fa-save\" style=\"margin-right:8px;\"></i>GUARDAR CONTRASEÑA";
+      }
+    })
+    .withFailureHandler(err => {
+      errEl.textContent = "❌ Error de conexión: " + err; errEl.style.display = "block";
+      btn.disabled = false; btn.innerHTML = "<i class=\"fas fa-save\" style=\"margin-right:8px;\"></i>GUARDAR CONTRASEÑA";
+    })
+    .cambiarPasswordUsuario(usuarioActual, nueva);
+}
+
+// ══════════════════════════════════════════════════════
+//  TIPO ORDEN
+// ══════════════════════════════════════════════════════
+const tipoNombres = {
+  OM: 'ORDEN DE MANTENIMIENTO',
+  OT: 'ORDEN DE TALLER MECANIZADO',
+  OH: 'ORDEN DE HERRAMENTALES'
+};
+
+function setTipoOrden(tipo) {
+  tipoActual = tipo;
+  // Botones
+  ['OM', 'OT', 'OH'].forEach(t => {
+    const b = document.getElementById('btn' + t);
+    b.className = 'btn-tipo' + (t === tipo ? ' active-' + t : '');
+  });
+  document.getElementById('labelTipoOrden').textContent = tipoNombres[tipo];
+  // Reiniciar máquina
+  resetMaquina();
+  // Actualizar folio
+  cargarFolio();
+  // Actualizar checks
+  renderChecksTipo();
+}
+
+// Token que se incrementa con cada solicitud de folio.
+// Si llega una respuesta con token viejo, se ignora.
+let _folioToken = 0;
+
+function cargarFolio() {
+  // Capturar el tipo AHORA (síncrono) y el token de esta solicitud
+  const tipoSolicitado = tipoActual;
+  const miToken = ++_folioToken;
+
+  // Mostrar "cargando..." mientras espera
+  document.getElementById('inpFolio').textContent = tipoSolicitado + '-....';
+
+  google.script.run
+    .withSuccessHandler(f => {
+      // Solo aplicar si este sigue siendo el último pedido
+      if (miToken !== _folioToken) return;
+      // Doble verificación: el folio recibido debe coincidir con el tipo actual
+      if (!f.startsWith(tipoActual)) return;
+      document.getElementById('inpFolio').textContent = f;
+    })
+    .withFailureHandler(() => {
+      if (miToken !== _folioToken) return;
+      document.getElementById('inpFolio').textContent = tipoSolicitado + '-????';
+    })
+    .getSiguienteFolio(tipoSolicitado);
+}
+
+// ══════════════════════════════════════════════════════
+//  TIPO REQUERIMIENTO
+// ══════════════════════════════════════════════════════
+const opcionesCheck = {
+  OM: ['FALLA MECÁNICA', 'FALLA ELÉCTRICA', 'LUBRICACIÓN', 'NEUMÁTICA', 'OTRA'],
+  OT: ['FABRICACIÓN DE REFACCIÓN', 'REPARACIÓN', 'OTRO'],
+  OH: ['PREPARACIÓN DE HERRAMIENTA', 'REAJUSTE DE HERRAMIENTA', 'FABRICACIÓN DE HERRAMIENTA', 'OTRO']
+};
+
+function renderChecksTipo() {
+  const div = document.getElementById('checksTipo');
+  const opts = opcionesCheck[tipoActual] || opcionesCheck.OM;
+  div.innerHTML = opts.map(o => `
+    <label class="check-item">
+      <input type="checkbox" name="tipoCheck" value="${o}">
+      ${o}
+    </label>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  PRIORIDAD
+// ══════════════════════════════════════════════════════
+function setPrioridad(p) {
+  prioActual = p;
+  document.querySelectorAll('.btn-prio').forEach(b => b.classList.remove('active'));
+  document.getElementById('prio-' + p)?.classList.add('active');
+  // Actualizar borde del container
+  const cont = document.getElementById('formContainer');
+  cont.className = 'container prio-' + p;
+}
+
+// ══════════════════════════════════════════════════════
+//  MODAL ÁREA
+// ══════════════════════════════════════════════════════
+function abrirModalAreas() {
+  const lista = document.getElementById('listaAreas');
+  renderAreas(procesos);
+  document.getElementById('searchArea').value = '';
+  document.getElementById('modalAreas').style.display = 'flex';
+}
+
+function renderAreas(arr) {
+  const lista = document.getElementById('listaAreas');
+  if (!arr.length) { lista.innerHTML = '<p style="text-align:center; color:#aaa; padding:20px;">Sin resultados</p>'; return; }
+  lista.innerHTML = arr.map(p => `
+    <button class="item-card" onclick="setArea('${p.replace(/'/g,"\\'")}')">${p}</button>
+  `).join('');
+}
+
+function filtrarAreas() {
+  const q = document.getElementById('searchArea').value.trim().toUpperCase();
+  const filtrados = q ? procesos.filter(p => p.toUpperCase().includes(q)) : procesos;
+  renderAreas(filtrados);
+}
+
+function setArea(nombre) {
+  document.getElementById('btnAreaTxt').textContent = nombre;
+  document.getElementById('btnAreaTxt').classList.remove('placeholder-txt');
+  document.getElementById('modalAreas').style.display = 'none';
+  resetMaquina();
+}
+
+// ══════════════════════════════════════════════════════
+//  MODAL MÁQUINA
+// ══════════════════════════════════════════════════════
+function abrirModalMaquinas() {
+  const areaTxt = document.getElementById('btnAreaTxt').textContent;
+  if (!areaTxt || document.getElementById('btnAreaTxt').classList.contains('placeholder-txt')) {
+    alert('Seleccione primero el Área');
+    return;
+  }
+  const filtradas = catalogo.filter(m => m.proceso === areaTxt);
+  document.getElementById('searchMaq').value = '';
+  renderMaquinas(filtradas, areaTxt);
+  document.getElementById('modalMaquinas').style.display = 'flex';
+}
+
+function renderMaquinas(arr, area) {
+  const lista = document.getElementById('listaMaquinas');
+  if (!arr.length) { lista.innerHTML = '<p style="text-align:center; color:#aaa; padding:20px;">No hay máquinas para esta área</p>'; return; }
+  const grupos = [...new Set(arr.map(m => m.grupo))].sort();
+  lista.innerHTML = grupos.map(g => {
+    const maqsGrupo = arr.filter(m => m.grupo === g);
+    return `<div class="grupo-header">${g}</div>` +
+      maqsGrupo.map(m => `<button class="item-card" onclick="setMaquina('${m.nombre.replace(/'/g,"\\'")}')">${m.nombre}</button>`).join('');
+  }).join('');
+}
+
+function filtrarMaquinas() {
+  const q = document.getElementById('searchMaq').value.trim().toUpperCase();
+  const areaTxt = document.getElementById('btnAreaTxt').textContent;
+  const filtradas = catalogo.filter(m => m.proceso === areaTxt &&
+    (q === '' || m.nombre.toUpperCase().includes(q)));
+  renderMaquinas(filtradas, areaTxt);
+}
+
+function setMaquina(nombre) {
+  document.getElementById('btnMaquinaTxt').textContent = nombre;
+  document.getElementById('btnMaquinaTxt').classList.remove('placeholder-txt');
+  document.getElementById('modalMaquinas').style.display = 'none';
+}
+
+function resetMaquina() {
+  document.getElementById('btnMaquinaTxt').textContent = 'Seleccione área primero...';
+  document.getElementById('btnMaquinaTxt').classList.add('placeholder-txt');
+}
+
+// ══════════════════════════════════════════════════════
+//  MÁQUINA PARADA
+// ══════════════════════════════════════════════════════
+function toggleTM() {
+  const b = document.getElementById('btnTM');
+  if (b.textContent.includes('NO')) {
+    b.textContent = '🚨 SÍ — MÁQUINA PARADA';
+    b.className = 'tm-si';
+  } else {
+    b.textContent = '✅ NO — MÁQUINA EN OPERACIÓN';
+    b.className = 'tm-no';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  FOTO / CÁMARA
+// ══════════════════════════════════════════════════════
+function abrirSeleccionFoto() {
+  const m = document.getElementById('modalFoto');
+  m.style.display = 'flex';
+}
+
+// Comprime y redimensiona la imagen a máximo 200KB
+function comprimirImagen(file, callback) {
+  const MAX_KB = 200;
+  const MAX_DIM = 1280; // máximo 1280px en el lado más largo
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Calcular nuevas dimensiones manteniendo proporción
+      let w = img.width, h = img.height;
+      if (w > MAX_DIM || h > MAX_DIM) {
+        if (w > h) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; }
+        else       { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Intentar calidades hasta quedar por debajo de MAX_KB
+      let calidad = 0.8;
+      let resultado = canvas.toDataURL('image/jpeg', calidad);
+
+      while (resultado.length > MAX_KB * 1024 * 1.37 && calidad > 0.2) {
+        // 1.37 porque base64 ocupa ~37% más que el binario
+        calidad -= 0.1;
+        resultado = canvas.toDataURL('image/jpeg', calidad);
+      }
+
+      const kb = Math.round(resultado.length * 0.75 / 1024); // estimación KB real
+      callback(resultado, kb);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function previsualizarFoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  document.getElementById('fotoEstado').textContent = '⏳ Procesando imagen...';
+  document.getElementById('fotoTxtBtn').textContent = 'Procesando...';
+
+  comprimirImagen(file, (base64Comprimido, kb) => {
+    fotoBase64 = base64Comprimido;
+    document.getElementById('fotoPreviewImg').src = fotoBase64;
+    document.getElementById('fotoPreviewArea').style.display = 'block';
+    document.getElementById('fotoTxtBtn').textContent = '📷 Foto adjunta';
+    document.getElementById('fotoEstado').textContent = '✅ Lista para subir (~' + kb + ' KB)';
+  });
+}
+
+function quitarFoto() {
+  fotoBase64 = null;
+  document.getElementById('fotoPreviewArea').style.display = 'none';
+  document.getElementById('fotoTxtBtn').textContent = 'TOMAR FOTO O ADJUNTAR ARCHIVO';
+  document.getElementById('fotoEstado').textContent = '';
+  document.getElementById('inputFoto').value = '';
+  document.getElementById('inputFotoCamara').value = '';
+  // Limpiar también del ticket
+  document.getElementById('t-foto-wrap').style.display = 'none';
+  document.getElementById('t-foto-img').src = '';
+}
+
+// ══════════════════════════════════════════════════════
+//  GUARDAR Y ENVIAR
+// ══════════════════════════════════════════════════════
+function guardarTodo() {
+  const area    = document.getElementById('btnAreaTxt').textContent;
+  const maquina = document.getElementById('btnMaquinaTxt').textContent;
+  const falla   = document.getElementById('inpFalla').value.trim();
+  const folio   = document.getElementById('inpFolio').textContent;
+  const tm      = document.getElementById('btnTM').textContent.includes('NO') ? 'NO' : 'SI';
+
+  // Validaciones
+  if (document.getElementById('btnAreaTxt').classList.contains('placeholder-txt')) {
+    return alert('❌ Seleccione el Área');
+  }
+  if (document.getElementById('btnMaquinaTxt').classList.contains('placeholder-txt')) {
+    return alert('❌ Seleccione la Máquina');
+  }
+  if (!falla) return alert('❌ Escriba el Reporte de Falla');
+
+  const tipos = Array.from(document.querySelectorAll('input[name="tipoCheck"]:checked'))
+    .map(c => c.value).join(', ');
+  if (!tipos) return alert('❌ Seleccione al menos un Tipo de Requerimiento');
+
+  // Mostrar overlay
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('overlay-text').textContent = 'Guardando datos...';
+  document.getElementById('overlay-subtext').textContent = 'Por favor espere';
+
+  // Preparar ticket para imagen
+  const prio = prioActual;
+  const ticket = document.getElementById('ticket-preview');
+  ticket.className = 'prio-' + prio;
+
+  const leyendas = {
+    'Critica': 'PRIORIDAD CRÍTICA — ATENCIÓN INMEDIATA',
+    'Alta':    'PRIORIDAD ALTA — DAR PRIORIDAD',
+    'Media':   'PRIORIDAD MEDIA — HACERLE UN ESPACIO',
+    'Baja':    'PRIORIDAD BAJA — PROGRAMAR TRABAJO'
+  };
+  document.getElementById('t-banner-top').textContent    = leyendas[prio] || '';
+  document.getElementById('t-banner-bottom').textContent = leyendas[prio] || '';
+  document.getElementById('t-folio').textContent    = folio;
+  document.getElementById('t-fecha').textContent    = new Date().toLocaleString('es-MX');
+  document.getElementById('t-area').textContent     = area;
+  document.getElementById('t-maquina').textContent  = maquina;
+  document.getElementById('t-tm').textContent       = tm;
+  document.getElementById('t-usuario').textContent  = usuarioActual;
+  document.getElementById('t-falla').textContent    = falla.toUpperCase();
+  document.getElementById('t-tipo').textContent     = tipos;
+
+  const ordenObj = {
+    folio:    folio,
+    area:     area,
+    maquina:  maquina,
+    falla:    falla,
+    prioridad: prio,
+    tm:       tm,
+    tipo:     tipos,
+    tipoOrden: tipoActual,
+    usuario:  usuarioActual,
+    fecha:    new Date().toLocaleDateString('es-MX')
+  };
+
+  // ── Poner foto en el ticket si existe ──
+  if (fotoBase64) {
+    document.getElementById('t-foto-img').src = fotoBase64;
+    document.getElementById('t-foto-wrap').style.display = 'block';
+  } else {
+    document.getElementById('t-foto-wrap').style.display = 'none';
+  }
+
+  // Función interna para proceder después de (opcionalmente) subir foto
+  function procederConGuardado(urlFoto) {
+    if (urlFoto) ordenObj.urlFoto = urlFoto;
+
+    setTimeout(() => {
+      html2canvas(ticket, { scale: 2 }).then(canvas => {
+        document.getElementById('overlay-text').textContent = 'Notificando a Telegram...';
+        const imgData = canvas.toDataURL('image/png');
+        google.script.run
+          .withSuccessHandler(() => {
+            google.script.run
+              .withSuccessHandler(() => {
+                document.getElementById('loading-ui').style.display = 'none';
+                document.getElementById('success-content').style.display = 'flex';
+                document.getElementById('success-folio').textContent = folio;
+              })
+              .withFailureHandler(err => {
+                alert('Error Telegram: ' + err);
+                document.getElementById('overlay').style.display = 'none';
+              })
+              .enviarTelegramConBotones(imgData, folio);
+          })
+          .withFailureHandler(err => {
+            alert('Error al guardar: ' + err);
+            document.getElementById('overlay').style.display = 'none';
+          })
+          .guardarOrden(ordenObj);
+      });
+    }, 600);
+  }
+
+  // Si hay foto, subirla primero
+  if (fotoBase64) {
+    document.getElementById('overlay-text').textContent = 'Subiendo foto a Drive...';
+    const ID_CARPETA_OT = '1sskDB2P86ybUJxa74-regiHxzL3X7mVN';
+    google.script.run
+      .withSuccessHandler(url => procederConGuardado(url))
+      .withFailureHandler(err => {
+        // Si falla subir foto, continúa de todas formas
+        console.warn('No se pudo subir la foto:', err);
+        procederConGuardado(null);
+      })
+      .subirFotoOrden(fotoBase64, folio, ID_CARPETA_OT);
+  } else {
+    procederConGuardado(null);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  NUEVA ORDEN (reset)
+// ══════════════════════════════════════════════════════
+function nuevaOrden() {
+  document.getElementById('success-content').style.display = 'none';
+  document.getElementById('loading-ui').style.display = 'flex';
+  document.getElementById('overlay-text').textContent = 'Preparando...';
+
+  // Reset campos
+  document.getElementById('inpFalla').value = '';
+  document.getElementById('btnAreaTxt').textContent = 'Toque para seleccionar área...';
+  document.getElementById('btnAreaTxt').classList.add('placeholder-txt');
+  resetMaquina();
+  quitarFoto();
+  document.getElementById('btnTM').textContent = '✅ NO — MÁQUINA EN OPERACIÓN';
+  document.getElementById('btnTM').className = 'tm-no';
+
+  // Reset checks
+  document.querySelectorAll('input[name="tipoCheck"]').forEach(c => c.checked = false);
+
+  // Cargar nuevo folio
+  cargarFolio();
+  setTimeout(() => { document.getElementById('overlay').style.display = 'none'; }, 600);
+}
+
+// ══════════════════════════════════════════════════════
+//  MIS SOLICITUDES
+// ══════════════════════════════════════════════════════
+function verMisSolicitudes() {
+  // Mostrar panel y spinner
+  document.getElementById('vistaSolicitudes').style.display = 'block';
+  document.getElementById('solContenido').innerHTML = `
+    <div class="sol-loading">
+      <div class="spinner" style="margin:0 auto 12px;"></div>
+      Cargando tus órdenes...
+    </div>`;
+
+  // Llamar GAS
+  google.script.run
+    .withSuccessHandler(renderSolicitudes)
+    .withFailureHandler(err => {
+      document.getElementById('solContenido').innerHTML =
+        '<div class="sol-empty"><i class="fas fa-exclamation-triangle"></i><p>Error al cargar: ' + err + '</p></div>';
+    })
+    .getMisOrdenes(usuarioActual);
+}
+
+function cerrarMisSolicitudes() {
+  document.getElementById('vistaSolicitudes').style.display = 'none';
+}
+
+function renderSolicitudes(lista) {
+  const div = document.getElementById('solContenido');
+
+  if (!lista || lista.length === 0) {
+    div.innerHTML = `
+      <div class="sol-empty">
+        <i class="fas fa-inbox"></i>
+        <p>No tienes órdenes en los últimos 60 días</p>
+      </div>`;
+    return;
+  }
+
+  // Badge de estado → clase CSS
+  function claseEstado(e) {
+    const s = (e || '').toUpperCase();
+    if (s.includes('ABIERTA'))    return 'estado-abierta';
+    if (s.includes('PROCESO') || s.includes('EN PROCESO')) return 'estado-proceso';
+    if (s.includes('TERMINADA') || s.includes('TERMINADO')) return 'estado-terminada';
+    if (s.includes('CERRADA') || s.includes('CERRADO'))    return 'estado-cerrada';
+    if (s.includes('CANCELADA') || s.includes('CANCELADO')) return 'estado-cancelada';
+    return 'estado-otro';
+  }
+
+  // Badge de prioridad → clase
+  function clasePrio(p) {
+    const s = (p || '').toUpperCase();
+    if (s.includes('CRIT')) return 'prio-critica';
+    if (s === 'ALTA')       return 'prio-alta';
+    if (s === 'MEDIA')      return 'prio-media';
+    return 'prio-baja-ch';
+  }
+
+  // Emoji de prioridad
+  function emojiPrio(p) {
+    const s = (p || '').toUpperCase();
+    if (s.includes('CRIT')) return '🚨';
+    if (s === 'ALTA')       return '🔴';
+    if (s === 'MEDIA')      return '🟡';
+    return '🔵';
+  }
+
+  let html = `<div class="sol-count">📋 ${lista.length} orden${lista.length !== 1 ? 'es' : ''} — últimos 60 días</div>`;
+
+  lista.forEach(o => {
+    const esCritica = (o.prioridad || '').toUpperCase().includes('CRIT');
+    const bordeColor = esCritica ? 'border-left: 4px solid #b71c1c;' : '';
+
+    html += `
+    <div class="sol-card" style="${bordeColor}">
+      <div class="sol-card-header">
+        <div>
+          <div class="sol-folio">${o.folio}</div>
+          <div class="sol-fecha">📅 ${o.fecha}</div>
+        </div>
+        <span class="sol-badge-estado ${claseEstado(o.estado)}">${o.estado}</span>
+      </div>
+      <table class="sol-tabla">
+        <tr>
+          <td>Área</td>
+          <td>${o.area || '—'}</td>
+        </tr>
+        <tr>
+          <td>Máquina</td>
+          <td>${o.maquina || '—'}</td>
+        </tr>
+        <tr>
+          <td>Falla</td>
+          <td>${o.falla || '—'}</td>
+        </tr>
+        <tr>
+          <td>Tipo</td>
+          <td>${o.tipo || '—'}</td>
+        </tr>
+        <tr>
+          <td>Prioridad</td>
+          <td><span class="prio-chip ${clasePrio(o.prioridad)}">${emojiPrio(o.prioridad)} ${o.prioridad}</span></td>
+        </tr>
+        ${o.tm === 'SI' && o.hrsTm ? `
+        <tr>
+          <td>Máq. parada</td>
+          <td>⏱ <b>${o.hrsTm} hrs</b></td>
+        </tr>` : ''}
+      </table>
+    </div>`;
+  });
+
+  div.innerHTML = html;
+}
+</script>
+</body>
+</html>
