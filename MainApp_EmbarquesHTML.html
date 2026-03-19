@@ -792,32 +792,35 @@ var _desp_searchCache = '';
 
 // ─────────────────────────────────────────────────────────────────────────────
 function loadDespachos(diasSolicitados) {
-  // diasSolicitados: número de días que el usuario pide.
-  // Si ya tenemos datos de X días y piden Y > X, solo pedimos la diferencia.
   var dias = diasSolicitados || 60;
 
-  // ¿Ya tenemos esos datos?
+  // ── Si estamos en modo offline, usar datos locales ──
+  if (_offlineActivo()) {
+    _desp_sourceData = _offlineGetLotes();
+    _desp_loadedDias = 90;
+    _despActualizarCombo(90);
+    _despResetPaginacion();
+    renderDespachos();
+    _offlineRenderBarra();
+    return;
+  }
+
+  // ── Modo normal (online) ──
   if (dias <= _desp_loadedDias && _desp_loadedDias > 0) {
-    // No hace falta ir al servidor
     _despActualizarCombo(dias);
     _despResetPaginacion();
     _despRenderFuente();
     return;
   }
-
-  // Necesitamos cargar
   showLoader('Cargando lotes (' + dias + ' días)...');
   google.script.run
     .withSuccessHandler(function(res) {
       hideLoader();
       var nuevos = Array.isArray(res) ? res : [];
-
       if (dias > _desp_loadedDias) {
-        // Merge inteligente: agregar solo los que no están ya cargados
         if (_desp_loadedDias === 0) {
           _desp_sourceData = nuevos;
         } else {
-          // Los nuevos incluyen todo el rango; filtramos los que ya teníamos
           var yaExisten = {};
           for (var k = 0; k < _desp_sourceData.length; k++) yaExisten[_desp_sourceData[k].lote] = true;
           for (var j = 0; j < nuevos.length; j++) {
@@ -826,13 +829,12 @@ function loadDespachos(diasSolicitados) {
         }
         _desp_loadedDias = dias;
       }
-
       if (!window._despModalEdit)
         window._despModalEdit = new bootstrap.Modal(document.getElementById('despModalEdit'));
-
       _despActualizarCombo(dias);
       _despResetPaginacion();
-      renderDespachos();   // primera vez renderiza el HTML base
+      renderDespachos();
+      _offlineRenderBarra();
     })
     .withFailureHandler(function(e) {
       hideLoader();
@@ -872,6 +874,7 @@ function renderDespachos() {
     +'<option value="150">150 días</option>'
     +'<option value="180">180 días</option>'
     +'</select>'
+    +_offlineBotonHTML()
     +'<button class="btn btn-sm btn-light fw-bold" onclick="_desp_loadedDias=0;_desp_sourceData=[];loadDespachos(parseInt(document.getElementById(\'desp-dias-sel\').value||\'60\'))"><i class="fas fa-sync-alt me-1"></i>Recargar</button>'
     +'</div></div>'
     +'<div class="modulo-body">'
@@ -1139,18 +1142,61 @@ function _despQuitarCola(lote) {
 }
 
 function _despImprimirFinal() {
-  if(!_desp_queueData.length) return;
-  if(!confirm('¿Generar etiquetas y marcar lotes como enviados?')) return;
+  if (!_desp_queueData.length) return;
+
+  if (_offlineActivo()) {
+    var pendientes = _offlineGetPendientes();
+    if (pendientes.length >= OFFLINE_LIMITE) {
+      Swal.fire({
+        title: '&#128683; L&#237;mite alcanzado',
+        html: 'Tienes <strong>' + pendientes.length + ' despachos</strong> sin sincronizar.<br>Conectate a internet y presiona <b>"Subir ahora"</b> antes de continuar.',
+        icon: 'error'
+      });
+      return;
+    }
+    var nuevos = _desp_queueData.slice();
+    var htmlEtiquetas = _offlineGenerarEtiquetasHTML(nuevos);
+    pendientes = pendientes.concat(nuevos.map(function(item) {
+      return {
+        lote: item.lote, tina: item.tina, kg: item.kg, sello: item.sello,
+        pesoBruto: item.pesoBruto || 0, pesoTina: item.pesoTina || 0,
+        ordenRef: item.ordenRef || '', ts: new Date().toISOString()
+      };
+    }));
+    _offlineSetPendientes(pendientes);
+    _desp_queueData = [];
+    _despRenderCola();
+    _offlineRenderBarra();
+    if (htmlEtiquetas) {
+      var win = window.open('', '_blank');
+      if (win) { win.document.write(htmlEtiquetas); win.document.close(); }
+    }
+    var impresosIds = nuevos.reduce(function(acc, x) { acc[x.lote] = true; return acc; }, {});
+    var lotesLocal  = _offlineGetLotes();
+    lotesLocal.forEach(function(l) { if (impresosIds[l.lote]) l.estatus = 'IMPRESO'; });
+    localStorage.setItem(OFFLINE_KEY_LOTES, JSON.stringify(lotesLocal));
+    _desp_sourceData = lotesLocal;
+    _despResetPaginacion();
+    _despRenderFuente();
+    Swal.fire({
+      title: '&#10003; Guardado sin conexi&#243;n',
+      html: nuevos.length + ' despacho(s) guardado(s) localmente.<br><small>Se subir&#225;n al conectarte y presionar "Subir ahora".</small>',
+      icon: 'success', timer: 3000, showConfirmButton: false
+    });
+    return;
+  }
+
+  if (!confirm('¿Generar etiquetas y marcar lotes como enviados?')) return;
   showLoader('Procesando etiquetas...');
   google.script.run
-    .withSuccessHandler(function(htmlContent){
+    .withSuccessHandler(function(htmlContent) {
       hideLoader();
       var win = window.open('', '_blank');
-      if(win) { win.document.write(htmlContent); win.document.close(); }
+      if (win) { win.document.write(htmlContent); win.document.close(); }
       _desp_queueData = [];
       loadDespachos();
     })
-    .withFailureHandler(function(e){ hideLoader(); Swal.fire('Error',''+e,'error'); })
+    .withFailureHandler(function(e) { hideLoader(); Swal.fire('Error', '' + e, 'error'); })
     .procesarYRenderizarEtiquetas(_desp_queueData);
 }
 // ══════════════════════════════════════════════════════════
@@ -4018,6 +4064,233 @@ function confirmarCambiarPasswordEmb() {
       Swal.fire({icon:'error',title:'Error de conexion',text:'No se pudo cambiar la contrasena.',confirmButtonColor:'#ef4444'});
     })
     .cambiarPasswordUsuario(currentUser.nombre, p1);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  MÓDULO OFFLINE — DESPACHOS
+// ══════════════════════════════════════════════════════════════════════════════
+
+var OFFLINE_KEY_LOTES      = 'despOffline_lotes';
+var OFFLINE_KEY_ORDENES    = 'despOffline_ordenes';
+var OFFLINE_KEY_PENDIENTES = 'despOffline_pendientes';
+var OFFLINE_KEY_ACTIVO     = 'despOffline_activo';
+var OFFLINE_KEY_FECHA      = 'despOffline_fecha';
+var OFFLINE_LIMITE         = 30;
+
+function _offlineActivo() {
+  return localStorage.getItem(OFFLINE_KEY_ACTIVO) === 'true';
+}
+function _offlineGetPendientes() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_KEY_PENDIENTES) || '[]'); }
+  catch(e) { return []; }
+}
+function _offlineSetPendientes(arr) {
+  localStorage.setItem(OFFLINE_KEY_PENDIENTES, JSON.stringify(arr));
+}
+function _offlineGetLotes() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_KEY_LOTES) || '[]'); }
+  catch(e) { return []; }
+}
+function _offlineGetOrdenes() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_KEY_ORDENES) || '{}'); }
+  catch(e) { return {}; }
+}
+
+function _offlineRenderBarra() {
+  var pendientes = _offlineGetPendientes();
+  var n          = pendientes.length;
+  var activo     = _offlineActivo();
+  var vieja = document.getElementById('offline-barra');
+  if (vieja) vieja.remove();
+  if (!activo && n === 0) return;
+  var colorFondo = n >= OFFLINE_LIMITE ? '#dc2626' : (activo ? '#ea580c' : '#16a34a');
+  var icono      = n >= OFFLINE_LIMITE ? '&#128683;' : (activo ? '&#9888;' : '&#9989;');
+  var texto      = activo
+    ? ('MODO SIN CONEXI&#211;N &mdash; <strong>' + n + ' cambio' + (n===1?'':'s') + ' por guardar</strong> (l&#237;mite: ' + OFFLINE_LIMITE + ')')
+    : ('Sincronizando... ' + n + ' cambio' + (n===1?'':'s') + ' pendiente' + (n===1?'':'s'));
+  var btnSync = n > 0
+    ? '<button onclick="_offlineSincronizar()" class="btn btn-sm btn-light fw-bold ms-3" style="font-size:.75rem;padding:2px 10px">&#9652; Subir ahora</button>'
+    : '';
+  var barra = document.createElement('div');
+  barra.id = 'offline-barra';
+  barra.innerHTML = icono + ' ' + texto + btnSync;
+  barra.style.cssText = 'background:'+colorFondo+';color:white;padding:7px 16px;font-size:.80rem;font-weight:600;display:flex;align-items:center;gap:8px;border-radius:0 0 6px 6px;position:sticky;top:0;z-index:999;box-shadow:0 2px 6px rgba(0,0,0,.25)';
+  var contenedor = document.querySelector('.modulo-inline') || document.getElementById('content-area');
+  if (contenedor) contenedor.insertBefore(barra, contenedor.firstChild);
+}
+
+function _offlineBotonHTML() {
+  var activo     = _offlineActivo();
+  var pendientes = _offlineGetPendientes().length;
+  var fecha      = localStorage.getItem(OFFLINE_KEY_FECHA) || '';
+  if (activo) {
+    var colorBtn = pendientes >= OFFLINE_LIMITE ? '#dc2626' : '#ea580c';
+    return '<button onclick="_offlineActivar()" class="btn btn-sm fw-bold" style="background:'+colorBtn+';color:white;font-size:.75rem" title="Datos del: '+fecha+'">&#9888; Sin conexi&#243;n ['+pendientes+'/'+OFFLINE_LIMITE+']</button>';
+  }
+  return '<button onclick="_offlineActivar()" class="btn btn-sm fw-bold" style="background:#0d47a1;color:white;font-size:.75rem">&#128246; Trabajar sin conexi&#243;n</button>';
+}
+
+function _offlineActivar() {
+  if (_offlineActivo()) {
+    Swal.fire({
+      title: 'Ya est&#225;s en modo sin conexi&#243;n',
+      text: '&#191;Deseas descargar datos actualizados de nuevo?',
+      icon: 'question', showCancelButton: true,
+      confirmButtonText: 'S&#237;, actualizar datos', cancelButtonText: 'Cancelar'
+    }).then(function(r) { if (r.isConfirmed) _offlineDescargar(); });
+    return;
+  }
+  _offlineDescargar();
+}
+
+function _offlineDescargar() {
+  var pendientes = _offlineGetPendientes();
+  if (pendientes.length > 0) {
+    Swal.fire({
+      title: 'Hay cambios sin guardar',
+      html: 'Tienes <strong>' + pendientes.length + ' despacho(s)</strong> pendientes de subir.<br>Primero sincroniza y luego descarga datos frescos.',
+      icon: 'warning', showCancelButton: true,
+      confirmButtonText: 'Subir cambios primero', cancelButtonText: 'Descargar de todas formas'
+    }).then(function(r) {
+      if (r.isConfirmed) { _offlineSincronizar(function() { _offlineDescargarEjecutar(); }); }
+      else { _offlineDescargarEjecutar(); }
+    });
+    return;
+  }
+  _offlineDescargarEjecutar();
+}
+
+function _offlineDescargarEjecutar() {
+  showLoader('Descargando datos offline (90 d&#237;as)...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoader();
+      if (!res || res.error) { Swal.fire('Error', res ? res.error : 'Sin respuesta del servidor', 'error'); return; }
+      localStorage.setItem(OFFLINE_KEY_LOTES,  JSON.stringify(res.lotes   || []));
+      localStorage.setItem(OFFLINE_KEY_ORDENES, JSON.stringify(res.ordenes || {}));
+      localStorage.setItem(OFFLINE_KEY_ACTIVO,  'true');
+      localStorage.setItem(OFFLINE_KEY_FECHA,   new Date().toLocaleString('es-MX'));
+      _desp_sourceData = res.lotes || [];
+      _desp_loadedDias = 90;
+      _despActualizarCombo(90);
+      _despResetPaginacion();
+      _despRenderFuente();
+      _offlineRenderBarra();
+      Swal.fire({
+        title: '&#9989; Modo sin conexi&#243;n activo',
+        html: '<b>' + _desp_sourceData.length + ' lotes</b> guardados.<br>Puedes desconectarte y seguir trabajando.',
+        icon: 'success', timer: 3000, showConfirmButton: false
+      });
+    })
+    .withFailureHandler(function(e) { hideLoader(); Swal.fire('Error al descargar', '' + e, 'error'); })
+    .obtenerDatosOffline();
+}
+
+function _offlineGenerarEtiquetasHTML(lista) {
+  var mapOrd = _offlineGetOrdenes();
+  var fecha  = new Date().toLocaleDateString('es-MX', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  var etiquetas = [];
+  lista.forEach(function(item) {
+    var infoO = mapOrd[item.ordenRef || ''] || mapOrd[item.lote] || null;
+    if (!infoO) return;
+    var pNeto = Number(item.kg) || 0;
+    var pUnit = Number(infoO.pesoU) || 0;
+    var conversion = '-';
+    if (pUnit > 0) {
+      var tipo = String(infoO.tipo || '').toUpperCase();
+      if (tipo.includes('VARILLA')) {
+        var lon = parseFloat(String(infoO.long).replace(/[^0-9.]/g,'')) || 1;
+        conversion = '( ' + Math.round(pNeto / (pUnit * lon)).toLocaleString('es-MX') + ' PZA )';
+      } else if (tipo.includes('COLATADO')) {
+        conversion = '( ' + Math.round(pNeto / pUnit).toLocaleString('es-MX') + ' ROLLOS )';
+      } else {
+        conversion = '( ' + Math.round(pNeto / pUnit).toLocaleString('es-MX') + ' PZA )';
+      }
+    }
+    etiquetas.push({
+      lote: item.lote, pedido: infoO.pedido||'-', codigo: infoO.codigo||'-', desc: infoO.desc||'-',
+      tipo: infoO.tipo||'-', dia: infoO.dia||'-', long: infoO.long||'-',
+      det: (infoO.cuerda||'')+' '+(infoO.cuerpo||''), acero: infoO.acero||'-',
+      pesoU: pUnit, pesoNeto: pNeto, conversion: conversion,
+      sello: item.sello||'-', tina: item.tina||'-',
+      pesoBruto: Number(item.pesoBruto)||0, pesoTina: Number(item.pesoTina)||0,
+      fechaImp: fecha, iconoTipo: infoO.iconoSVG||''
+    });
+  });
+  if (!etiquetas.length) return null;
+  var rows = etiquetas.map(function(e) {
+    return '<div style="page-break-after:always;padding:20px;font-family:Arial,sans-serif;max-width:800px;margin:0 auto;border:2px solid #1A237E">'
+      +'<table width="100%" style="border-collapse:collapse">'
+      +'<tr><td colspan="4" style="background:#1A237E;color:white;padding:8px;font-size:18px;font-weight:bold;text-align:center">EMBARQUES CN &mdash; '+e.codigo+'</td></tr>'
+      +'<tr>'
+      +'<td style="padding:6px;border:1px solid #ccc;font-size:11px"><b>LOTE</b><br>'+e.lote+'</td>'
+      +'<td style="padding:6px;border:1px solid #ccc;font-size:11px"><b>PEDIDO</b><br>'+e.pedido+'</td>'
+      +'<td style="padding:6px;border:1px solid #ccc;font-size:11px"><b>SELLO</b><br>'+e.sello+'</td>'
+      +'<td style="padding:6px;border:1px solid #ccc;font-size:11px"><b>TINA</b><br>'+e.tina+'</td>'
+      +'</tr>'
+      +'<tr><td colspan="4" style="padding:6px;border:1px solid #ccc;font-size:13px"><b>DESCRIPCI&#211;N:</b> '+e.desc+'</td></tr>'
+      +'<tr>'
+      +'<td style="padding:6px;border:1px solid #ccc;font-size:12px"><b>TIPO</b><br>'+e.tipo+'</td>'
+      +'<td style="padding:6px;border:1px solid #ccc;font-size:12px"><b>DIA</b><br>'+e.dia+'</td>'
+      +'<td style="padding:6px;border:1px solid #ccc;font-size:12px"><b>LONG</b><br>'+e.long+'</td>'
+      +'<td style="padding:6px;border:1px solid #ccc;font-size:12px"><b>ACERO</b><br>'+e.acero+'</td>'
+      +'</tr>'
+      +'<tr style="background:#e8f5e9">'
+      +'<td style="padding:8px;border:1px solid #ccc;font-size:13px;font-weight:bold" colspan="2">PESO BRUTO: '+e.pesoBruto.toLocaleString('es-MX')+' KG</td>'
+      +'<td style="padding:8px;border:1px solid #ccc;font-size:13px;font-weight:bold" colspan="2">TARA TINA: '+e.pesoTina.toLocaleString('es-MX')+' KG</td>'
+      +'</tr>'
+      +'<tr style="background:#1A237E">'
+      +'<td colspan="2" style="padding:10px;color:white;font-size:22px;font-weight:bold;text-align:center">PESO NETO: '+e.pesoNeto.toLocaleString('es-MX')+' KG</td>'
+      +'<td colspan="2" style="padding:10px;color:white;font-size:16px;font-weight:bold;text-align:center">'+e.conversion+'</td>'
+      +'</tr>'
+      +'<tr><td colspan="4" style="padding:4px;font-size:10px;color:#666;text-align:right">Impreso: '+e.fechaImp+' [OFFLINE]</td></tr>'
+      +'</table></div>';
+  });
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas</title><style>@media print{body{margin:0}}</style></head><body>'+rows.join('')+'</body></html>';
+}
+
+function _offlineSincronizar(callbackDespues) {
+  var pendientes = _offlineGetPendientes();
+  if (!pendientes.length) {
+    Swal.fire('Sin pendientes', 'No hay cambios por sincronizar.', 'info');
+    if (typeof callbackDespues === 'function') callbackDespues();
+    return;
+  }
+  if (!navigator.onLine) {
+    Swal.fire({ title: 'Sin internet', text: 'No hay conexi&#243;n a internet. Conect&#225;te y vuelve a intentarlo.', icon: 'warning' });
+    return;
+  }
+  showLoader('Sincronizando ' + pendientes.length + ' despacho(s)...');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      hideLoader();
+      if (res && res.ok) {
+        _offlineSetPendientes([]);
+        Swal.fire({
+          title: '&#9989; Sincronizado',
+          html: '<b>' + res.procesados + '</b> despacho(s) guardados en el servidor.<br>&#191;Deseas salir del modo sin conexi&#243;n?',
+          icon: 'success', showCancelButton: true,
+          confirmButtonText: 'S&#237;, volver a modo normal', cancelButtonText: 'Seguir sin conexi&#243;n'
+        }).then(function(r) {
+          if (r.isConfirmed) {
+            localStorage.removeItem(OFFLINE_KEY_ACTIVO);
+            localStorage.removeItem(OFFLINE_KEY_LOTES);
+            localStorage.removeItem(OFFLINE_KEY_ORDENES);
+            localStorage.removeItem(OFFLINE_KEY_FECHA);
+          }
+          _offlineRenderBarra();
+          loadDespachos();
+          if (typeof callbackDespues === 'function') callbackDespues();
+        });
+      } else {
+        Swal.fire('Error al sincronizar', res ? (res.error || 'Error desconocido') : 'Sin respuesta', 'error');
+      }
+    })
+    .withFailureHandler(function(e) {
+      hideLoader();
+      Swal.fire('Error de conexi&#243;n', 'No se pudo conectar al servidor: ' + e, 'error');
+    })
+    .sincronizarDespachosOffline(pendientes);
 }
 
 </script>

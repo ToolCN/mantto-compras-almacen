@@ -808,14 +808,24 @@ function getOrdenesAnio(anio) {
 //  TÉCNICOS
 // ══════════════════════════════════════════════════════════════════════
 
-// Versión unificada — filtra por Col E (AREA) = "MANTENIMIENTO"
-function getTecnicos() {
+// Devuelve técnicos según el tipo de folio y filtra por estado ACTIVO/INCAPACIDAD
+// folio: string como "OM-001", "OT-005", "OH-002"
+function getTecnicos(folio) {
   try {
-    var ss = SpreadsheetApp.openById(ID_HOJA_ESTANDARES);
+    var ss   = SpreadsheetApp.openById(ID_HOJA_ESTANDARES);
     var data = ss.getSheetByName("OPERADORES").getDataRange().getValues();
-    return data.filter(function(r){ return String(r[4]).toUpperCase().includes("MANTENIMIENTO"); })
-               .map(function(r){ return r[1]; });
-  } catch(e) { return []; }
+    var prefix = folio ? String(folio).split("-")[0].toUpperCase() : "OM";
+    var area   = (prefix === "OM") ? "MANTENIMIENTO" : "TALLER MECANIZADO";
+    return data
+      .filter(function(r) {
+        var estadoOp = String(r[9] || "").toUpperCase().trim();
+        var areaOp   = String(r[4] || "").toUpperCase().trim();
+        var estadoOk = (estadoOp === "ACTIVO" || estadoOp === "INCAPACIDAD");
+        var areaOk   = areaOp.includes(area);
+        return estadoOk && areaOk && r[1];
+      })
+      .map(function(r) { return String(r[1]).trim(); });
+  } catch(e) { Logger.log("getTecnicos: " + e); return []; }
 }
 
 function getTecnicosDeArea(area) {
@@ -1350,7 +1360,8 @@ function getCatalogos() {
     var proc = String(data[i][2] || "").trim();
     var maq = String(data[i][3] || "").trim();
     var grupo = String(data[i][9] || "OTROS").trim();
-    if (proc) { procesos.push(proc); if (maq) maquinas.push({proceso: proc, nombre: maq, grupo: grupo}); }
+    var desc  = String(data[i][10] || "").trim();
+    if (proc) { procesos.push(proc); if (maq) maquinas.push({proceso: proc, nombre: maq, grupo: grupo, descripcion: desc}); }
   }
   return { procesos: [...new Set(procesos)].sort(), maquinas: maquinas };
 }

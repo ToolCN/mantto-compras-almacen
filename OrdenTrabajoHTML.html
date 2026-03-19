@@ -422,9 +422,30 @@
       .btn-tipo { font-size: 12px; padding: 10px 7px; min-width: 42px; min-height: 48px; }
       .btn-prio { font-size: 11px; padding: 9px 4px; }
     }
+    .btn-libro-fixed {
+      position: fixed; top: 10px; left: 10px; z-index: 9000;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--primary); border: none; border-radius: 8px;
+      width: 36px; height: 36px; cursor: pointer;
+      text-decoration: none; color: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3);
+      transition: background .2s, transform .2s;
+    }
+    .btn-libro-fixed:hover { background: #283593; transform: scale(1.1); }
+    .btn-libro-fixed i {
+      font-size: 18px;
+      animation: libro-flip 2.4s ease-in-out infinite;
+      transform-origin: center;
+    }
+    @keyframes libro-flip {
+      0%,100% { transform: rotateY(0deg) scale(1); }
+      40%      { transform: rotateY(20deg) scale(1.15); }
+      60%      { transform: rotateY(-10deg) scale(1.08); }
+    }
   </style>
 </head>
 <body>
+  <a class="btn-libro-fixed" href="https://toolcn.github.io/libro_ordenes_trabajo.html" target="_blank" title="Libro de Órdenes"><i class="fas fa-book-open"></i></a>
 
 <!-- ══════════ OVERLAY ══════════ -->
 <div id="overlay">
@@ -828,6 +849,7 @@ let tipoActual = 'OM';
 let prioActual = 'Media';
 let usuarioActual = '';
 let fotoBase64 = null;
+let descripcionMaquinaActual = '';
 let _acSelectedUser = null;
 
 // ══════════════════════════════════════════════════════
@@ -1175,7 +1197,10 @@ function renderMaquinas(arr, area) {
   lista.innerHTML = grupos.map(g => {
     const maqsGrupo = arr.filter(m => m.grupo === g);
     return `<div class="grupo-header">${g}</div>` +
-      maqsGrupo.map(m => `<button class="item-card" onclick="setMaquina('${m.nombre.replace(/'/g,"\\'")}')">${m.nombre}</button>`).join('');
+      maqsGrupo.map(m => `<button class="item-card" onclick="setMaquina('${m.nombre.replace(/'/g,"\\'")}','${(m.descripcion||'').replace(/'/g,"\\'")}')">
+    ${m.nombre}
+    ${m.descripcion ? `<div style="font-size:11px;color:#999;font-weight:400;margin-top:3px;">${m.descripcion}</div>` : ''}
+  </button>`).join('');
   }).join('');
 }
 
@@ -1183,17 +1208,20 @@ function filtrarMaquinas() {
   const q = document.getElementById('searchMaq').value.trim().toUpperCase();
   const areaTxt = document.getElementById('btnAreaTxt').textContent;
   const filtradas = catalogo.filter(m => m.proceso === areaTxt &&
-    (q === '' || m.nombre.toUpperCase().includes(q)));
+    (q === '' || m.nombre.toUpperCase().includes(q) || (m.descripcion||'').toUpperCase().includes(q)));
   renderMaquinas(filtradas, areaTxt);
 }
 
-function setMaquina(nombre) {
-  document.getElementById('btnMaquinaTxt').textContent = nombre;
-  document.getElementById('btnMaquinaTxt').classList.remove('placeholder-txt');
+function setMaquina(nombre, descripcion) {
+  descripcionMaquinaActual = descripcion || '';
+  const span = document.getElementById('btnMaquinaTxt');
+  span.classList.remove('placeholder-txt');
+  span.innerHTML = nombre + (descripcion ? `<div style="font-size:11px;color:#999;font-weight:400;margin-top:2px;">${descripcion}</div>` : '');
   document.getElementById('modalMaquinas').style.display = 'none';
 }
 
 function resetMaquina() {
+  descripcionMaquinaActual = '';
   document.getElementById('btnMaquinaTxt').textContent = 'Seleccione área primero...';
   document.getElementById('btnMaquinaTxt').classList.add('placeholder-txt');
 }
@@ -1293,7 +1321,10 @@ function quitarFoto() {
 // ══════════════════════════════════════════════════════
 function guardarTodo() {
   const area    = document.getElementById('btnAreaTxt').textContent;
-  const maquina = document.getElementById('btnMaquinaTxt').textContent;
+  const maquina = document.getElementById('btnMaquinaTxt').firstChild
+    ? document.getElementById('btnMaquinaTxt').firstChild.textContent.trim()
+    : document.getElementById('btnMaquinaTxt').textContent.trim();
+  const descripcion = descripcionMaquinaActual || '';
   const falla   = document.getElementById('inpFalla').value.trim();
   const folio   = document.getElementById('inpFolio').textContent;
   const tm      = document.getElementById('btnTM').textContent.includes('NO') ? 'NO' : 'SI';
@@ -1332,7 +1363,7 @@ function guardarTodo() {
   document.getElementById('t-folio').textContent    = folio;
   document.getElementById('t-fecha').textContent    = new Date().toLocaleString('es-MX');
   document.getElementById('t-area').textContent     = area;
-  document.getElementById('t-maquina').textContent  = maquina;
+  document.getElementById('t-maquina').innerHTML = maquina + (descripcion ? `<div style="font-size:14px;color:#666;font-weight:400;margin-top:2px;">${descripcion}</div>` : '');
   document.getElementById('t-tm').textContent       = tm;
   document.getElementById('t-usuario').textContent  = usuarioActual;
   document.getElementById('t-falla').textContent    = falla.toUpperCase();
@@ -1341,7 +1372,8 @@ function guardarTodo() {
   const ordenObj = {
     folio:    folio,
     area:     area,
-    maquina:  maquina,
+    maquina:      maquina,
+    descripcion:  descripcion,
     falla:    falla,
     prioridad: prio,
     tm:       tm,

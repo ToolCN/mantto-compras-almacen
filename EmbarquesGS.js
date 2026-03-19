@@ -1089,3 +1089,117 @@ function obtenerIconoSVG(tipo) {
 
   return svgStart + path + "</svg>";
 }
+
+function obtenerDatosOffline() {
+  try {
+    var ss     = SpreadsheetApp.openById(ID_SS_PRODUCCION);
+    var sheetL = ss.getSheetByName('LOTES');
+    var sheetO = ss.getSheetByName('ORDENES');
+    if (!sheetL) return { error: 'No existe la hoja LOTES en Producción' };
+    if (!sheetO) return { error: 'No existe la hoja ORDENES en Producción' };
+    var lastRowL = sheetL.getLastRow();
+    var lastRowO = sheetO.getLastRow();
+    if (lastRowL < 2) return { lotes: [], ordenes: {} };
+    var hRow = sheetL.getRange(1, 1, 1, 16).getValues()[0];
+    var hL   = hRow.map(function(h) { return String(h).toUpperCase().trim(); });
+    var iLote  = hL.indexOf('LOTE');         if (iLote  < 0) iLote  = 4;
+    var iOrden = hL.indexOf('ORDEN');        if (iOrden < 0) iOrden = 2;
+    var iEst   = hL.indexOf('ESTATUS');      if (iEst   < 0) iEst   = 14;
+    var iKg    = hL.indexOf('KG_EMBARQUES'); if (iKg    < 0) iKg    = 13;
+    var iTina  = hL.indexOf('TINA');         if (iTina  < 0) iTina  = 11;
+    var iSello = hL.indexOf('SELLO_EMB');    if (iSello < 0) iSello = 15;
+    var iFecha = hL.indexOf('FECHA_REG');    if (iFecha < 0) iFecha = 8;
+    var dataL    = sheetL.getRange(2, 1, lastRowL - 1, 16).getValues();
+    var limiteMs = new Date().getTime() - 90 * 24 * 60 * 60 * 1000;
+    var candidatos = [], idsNecesarios = {};
+    for (var j = 0; j < dataL.length; j++) {
+      var row    = dataL[j];
+      var loteID = String(row[iLote]).trim();
+      if (!loteID || loteID === 'undefined') continue;
+      var fReg = row[iFecha];
+      if (fReg) {
+        var fMs = (fReg instanceof Date) ? fReg.getTime() : new Date(fReg).getTime();
+        if (!isNaN(fMs) && fMs < limiteMs) continue;
+      }
+      var est = String(row[iEst]).toUpperCase().trim();
+      if (est === 'CANCELADO') continue;
+      var idOrden = String(row[iOrden]).trim();
+      idsNecesarios[idOrden] = true;
+      candidatos.push({
+        lote: loteID, idOrden: idOrden,
+        estatus: (est === 'NADA' || est === '') ? 'PENDIENTE' : est,
+        kg: Number(row[iKg]) || 0,
+        tina: String(row[iTina] || ''),
+        sello: String(row[iSello] || '')
+      });
+    }
+    var mapOrd = {};
+    if (lastRowO > 1) {
+      var colsAB = sheetO.getRange(2, 1,  lastRowO - 1, 2).getValues();
+      var colsGH = sheetO.getRange(2, 7,  lastRowO - 1, 2).getValues();
+      var colsSY = sheetO.getRange(2, 19, lastRowO - 1, 7).getValues();
+      for (var i = 0; i < colsAB.length; i++) {
+        var idO = String(colsAB[i][0]).trim();
+        if (!idO || !idsNecesarios[idO]) continue;
+        var tipo = String(colsSY[i][1] || '').toUpperCase();
+        mapOrd[idO] = {
+          pedido: String(colsAB[i][1] || '-'),
+          codigo: String(colsGH[i][0] || '-'),
+          desc:   String(colsGH[i][1] || 'Sin Desc'),
+          pesoU:  Number(colsSY[i][0]) || 0,
+          tipo:   tipo,
+          dia:    String(colsSY[i][2] || '-'),
+          long:   String(colsSY[i][3] || '-'),
+          cuerda: String(colsSY[i][4] || ''),
+          cuerpo: String(colsSY[i][5] || ''),
+          acero:  String(colsSY[i][6] || '-'),
+          iconoSVG: obtenerIconoSVG(tipo)
+        };
+      }
+    }
+    var lotes = candidatos.map(function(c) {
+      var info = mapOrd[c.idOrden] || { pedido: '-', codigo: '-', desc: 'Orden ' + c.idOrden };
+      return {
+        lote: c.lote, idOrden: c.idOrden,
+        pedido: info.pedido, codigo: info.codigo, desc: info.desc,
+        estatus: c.estatus, kg: c.kg, tina: c.tina, sello: c.sello
+      };
+    });
+    return { lotes: lotes, ordenes: mapOrd };
+  } catch (e) {
+    return { error: e.toString() };
+  }
+}
+
+function sincronizarDespachosOffline(listaPendientes) {
+  try {
+    if (!listaPendientes || !listaPendientes.length) return { ok: true, procesados: 0 };
+    var ss     = SpreadsheetApp.openById(ID_SS_PRODUCCION);
+    var sheetL = ss.getSheetByName('LOTES');
+    if (!sheetL) return { ok: false, error: 'No existe hoja LOTES' };
+    var dataL = sheetL.getDataRange().getValues();
+    var mapFilas = {};
+    for (var j = 1; j < dataL.length; j++) {
+      var idL = String(dataL[j][4]).trim();
+      if (idL) mapFilas[idL] = j + 1;
+    }
+    var procesados = 0;
+    var fechaNow   = new Date();
+    listaPendientes.forEach(function(item) {
+      var loteStr = String(item.lote).trim();
+      var fila    = mapFilas[loteStr];
+      if (!fila) return;
+      sheetL.getRange(fila, 12).setValue(item.tina        || '');
+      sheetL.getRange(fila, 13).setValue(fechaNow);
+      sheetL.getRange(fila, 14).setValue(Number(item.kg)  || 0);
+      sheetL.getRange(fila, 15).setValue('IMPRESO');
+      sheetL.getRange(fila, 16).setValue(item.sello       || '');
+      sheetL.getRange(fila, 18).setValue(Number(item.pesoBruto) || 0);
+      sheetL.getRange(fila, 19).setValue(Number(item.pesoTina)  || 0);
+      procesados++;
+    });
+    return { ok: true, procesados: procesados };
+  } catch (e) {
+    return { ok: false, error: e.toString() };
+  }
+}

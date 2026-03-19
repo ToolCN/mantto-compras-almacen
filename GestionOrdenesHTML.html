@@ -343,7 +343,24 @@
     margin-bottom: 8px;
     display: flex; align-items: center; gap: 8px;
   }
-
+    .btn-libro {
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,.18); border: none; border-radius: 8px;
+      width: 36px; height: 36px; cursor: pointer; flex-shrink: 0;
+      text-decoration: none; color: white;
+      transition: background .2s, transform .2s;
+    }
+    .btn-libro:hover { background: rgba(255,255,255,.32); transform: scale(1.1); }
+    .btn-libro i {
+      font-size: 18px;
+      animation: libro-flip 2.4s ease-in-out infinite;
+      transform-origin: center;
+    }
+    @keyframes libro-flip {
+      0%,100% { transform: rotateY(0deg) scale(1); }
+      40%      { transform: rotateY(20deg) scale(1.15); }
+      60%      { transform: rotateY(-10deg) scale(1.08); }
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -419,6 +436,7 @@
 <!-- ══════════════════════════════════════════ -->
 <div id="vista-lista" class="vista">
   <div class="app-header">
+    <a class="btn-libro" href="https://toolcn.github.io/libro_ordenes_trabajo.html" target="_blank" title="Libro de Órdenes"><i class="fas fa-book-open"></i></a>
     <h2><i class="fas fa-clipboard-list" style="margin-right:8px;"></i>ÓRDENES VIVAS</h2>
     <div class="header-right">
       <div class="user-badge"><i class="fas fa-user-check"></i><span id="labelUsuario">...</span></div>
@@ -685,13 +703,6 @@ function mostrarLogin() {
 function cargarOrdenes() {
   mostrarOverlay("Cargando órdenes...", "Por favor espere");
 
-  // Cargar técnicos en paralelo
-  google.script.run
-    .withSuccessHandler(list => {
-      listaTecnicos = (list || []).filter(t => !t.toUpperCase().includes("VACANTE"));
-    })
-    .getTecnicos();
-
   google.script.run
     .withSuccessHandler(data => {
       ordenes = data || [];
@@ -769,7 +780,7 @@ function renderLista() {
       <div class="orden-card-icon icon-${est}">${icon}</div>
       <div class="orden-card-info">
         <div class="orden-folio">${o.folio}</div>
-        <div class="orden-maquina">⚙️ ${o.maquina}</div>
+        <div class="orden-maquina">⚙️ ${o.maquina}${o.descripcion?`<span style="font-size:11px;color:#999;font-weight:400;margin-left:6px;">${o.descripcion}</span>`:''}</div>
         <div class="orden-fecha">📅 ${o.fecha}</div>
       </div>
       <div class="orden-badge badge-${est}">${o.estado}</div>
@@ -830,7 +841,7 @@ function abrirDetalle(folio) {
   document.getElementById('d-fecha').textContent           = ordenActual.fecha;
   document.getElementById('d-fecha-reporte').textContent   = ordenActual.fechaReporte || "—";
   document.getElementById('d-area').textContent            = ordenActual.area         || "—";
-  document.getElementById('d-maquina').textContent         = ordenActual.maquina      || "—";
+  document.getElementById('d-maquina').innerHTML = (ordenActual.maquina||'—') + (ordenActual.descripcion?`<div style="font-size:11px;color:#999;font-weight:400;margin-top:2px;">${ordenActual.descripcion}</div>`:'');
   document.getElementById('d-tipo').textContent            = ordenActual.tipo         || "—";
   document.getElementById('d-prioridad').textContent       = ordenActual.prioridad    || "—";
   document.getElementById('d-solicitante').textContent     = ordenActual.solicitante  || "—";
@@ -846,6 +857,15 @@ function abrirDetalle(folio) {
  
   actualizarBtnTecnico();
   renderBotonesEstado();
+
+  // Cargar técnicos según el tipo de esta orden específica
+  listaTecnicos = [];
+  google.script.run
+    .withSuccessHandler(list => {
+      listaTecnicos = (list || []).filter(t => !t.toUpperCase().includes("VACANTE"));
+    })
+    .getTecnicos(folio);
+
   mostrarVista('detalle');
  
   // Obtener fotoBase64 en segundo plano (no bloquea la apertura del detalle)
@@ -936,7 +956,21 @@ function actualizarBtnTecnico() {
 // ══════════════════════════
 function abrirModalTecnicos() {
   document.getElementById('modal-tecnicos').style.display = "flex";
-  renderizarTecnicosModal();
+
+  const lista = document.getElementById('lista-tecnicos-modal');
+  // Siempre mostrar spinner y cargar frescos al abrir
+  lista.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa;"><div class="spinner" style="margin:auto;"></div><p style="margin-top:12px;font-weight:700;">Cargando técnicos...</p></div>`;
+
+  const folioActual = ordenActual ? ordenActual.folio : '';
+  google.script.run
+    .withSuccessHandler(list => {
+      listaTecnicos = (list || []).filter(t => !t.toUpperCase().includes("VACANTE"));
+      renderizarTecnicosModal();
+    })
+    .withFailureHandler(() => {
+      lista.innerHTML = `<p style="text-align:center;color:#d32f2f;padding:30px;font-weight:700;">❌ Error al cargar técnicos.<br>Cierra y vuelve a intentar.</p>`;
+    })
+    .getTecnicos(folioActual);
 }
 function cerrarModalTecnicos() {
   document.getElementById('modal-tecnicos').style.display = "none";
@@ -1087,7 +1121,7 @@ function _llenarTicket() {
   document.getElementById('tr-folio').textContent   = ordenActual.folio   || "";
   document.getElementById('tr-fecha').textContent   = new Date().toLocaleString('es-MX');
   document.getElementById('tr-area').textContent    = ordenActual.area    || "";
-  document.getElementById('tr-maquina').textContent = ordenActual.maquina || "";
+  document.getElementById('tr-maquina').innerHTML = (ordenActual.maquina||'') + (ordenActual.descripcion?`<div style="font-size:14px;color:#666;font-weight:400;margin-top:2px;">${ordenActual.descripcion}</div>`:'');
   document.getElementById('tr-tecnico').textContent = tecnicoSel          || "Sin asignar";
   document.getElementById('tr-tm').textContent      = ordenActual.tm      || "NO";
   document.getElementById('tr-tipo').textContent    = ordenActual.tipo    || "";

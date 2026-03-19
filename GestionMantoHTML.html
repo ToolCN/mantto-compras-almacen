@@ -290,6 +290,24 @@
     }
     .wm-iniciado { color: #0288d1; border-color: #0288d1; }
     .wm-cancelado { color: #d32f2f; border-color: #d32f2f; }
+    .btn-libro {
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,.18); border: none; border-radius: 8px;
+      width: 36px; height: 36px; cursor: pointer; flex-shrink: 0;
+      text-decoration: none; color: white;
+      transition: background .2s, transform .2s;
+    }
+    .btn-libro:hover { background: rgba(255,255,255,.32); transform: scale(1.1); }
+    .btn-libro i {
+      font-size: 18px;
+      animation: libro-flip 2.4s ease-in-out infinite;
+      transform-origin: center;
+    }
+    @keyframes libro-flip {
+      0%,100% { transform: rotateY(0deg) scale(1); }
+      40%      { transform: rotateY(20deg) scale(1.15); }
+      60%      { transform: rotateY(-10deg) scale(1.08); }
+    }
   </style>
 </head>
 <body>
@@ -374,6 +392,7 @@
 
     <!-- HEADER -->
     <div class="page-header">
+      <a class="btn-libro" href="https://toolcn.github.io/libro_ordenes_trabajo.html" target="_blank" title="Libro de Órdenes"><i class="fas fa-book-open"></i></a>
       <h2><i class="fas fa-tools" style="margin-right:8px;"></i>GESTIÓN MANTTO</h2>
       <div class="header-right">
         <div class="user-badge-header">
@@ -639,13 +658,12 @@ function cargarOrden() {
   document.getElementById('overlay').style.display = "flex";
   document.getElementById('msg').textContent = "Cargando orden...";
 
-  // Cargar técnicos
+  // Cargar técnicos pasando el folio para filtrar por área correcta
   google.script.run
     .withSuccessHandler(list => {
-      // Filtrar vacantes
-      listaTecnicos = list.filter(t => !t.toUpperCase().includes("VACANTE"));
+      listaTecnicos = (list || []).filter(t => !t.toUpperCase().includes("VACANTE"));
     })
-    .getTecnicos();
+    .getTecnicos(folio);
 
   // Cargar datos de la orden
   google.script.run
@@ -676,7 +694,7 @@ function llenarDetalles(res) {
   // Llenar panel de información visible
   document.getElementById('h-folio').textContent       = res.folio       || "—";
   document.getElementById('h-area').textContent        = res.area        || "—";
-  document.getElementById('h-maquina').textContent     = res.maquina     || "—";
+  document.getElementById('h-maquina').innerHTML = (res.maquina||'—') + (res.descripcion?`<div style="font-size:11px;color:#999;font-weight:400;margin-top:2px;">${res.descripcion}</div>`:'');
   document.getElementById('h-tipo').textContent        = res.tipo        || "—";
   document.getElementById('h-prioridad').textContent   = res.prioridad   || "—";
   document.getElementById('h-solicitante').textContent = res.solicitante || "—";
@@ -686,7 +704,7 @@ function llenarDetalles(res) {
   // Llenar campos base del ticket oculto
   document.getElementById('tr-folio').textContent   = res.folio   || "";
   document.getElementById('tr-area').textContent    = res.area    || "";
-  document.getElementById('tr-maquina').textContent = res.maquina || "";
+  document.getElementById('tr-maquina').innerHTML = (res.maquina||'') + (res.descripcion?`<div style="font-size:14px;color:#666;font-weight:400;margin-top:2px;">${res.descripcion}</div>`:'');
   document.getElementById('tr-tm').textContent      = res.tm      || "NO";
   document.getElementById('tr-tipo').textContent    = res.tipo    || "";
   document.getElementById('tr-falla').textContent   = (res.falla  || "").toUpperCase();
@@ -711,19 +729,18 @@ function abrirModalTecnicos() {
   modal.style.display = "flex";
 
   const lista = document.getElementById('lista-tecnicos');
+  // Siempre mostrar spinner y cargar frescos al abrir
+  lista.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa;"><div class="spinner" style="margin:auto;"></div><p style="margin-top:12px;font-weight:700;">Cargando técnicos...</p></div>`;
 
-  if (listaTecnicos.length === 0) {
-    // Si aún no cargaron, intentar de nuevo
-    lista.innerHTML = `<div style="text-align:center;padding:40px;color:#aaa;"><div class="spinner" style="margin:auto;"></div><p>Cargando técnicos...</p></div>`;
-    google.script.run
-      .withSuccessHandler(list => {
-        listaTecnicos = list.filter(t => !t.toUpperCase().includes("VACANTE"));
-        renderizarTecnicos();
-      })
-      .getTecnicos();
-  } else {
-    renderizarTecnicos();
-  }
+  google.script.run
+    .withSuccessHandler(list => {
+      listaTecnicos = (list || []).filter(t => !t.toUpperCase().includes("VACANTE"));
+      renderizarTecnicos();
+    })
+    .withFailureHandler(() => {
+      lista.innerHTML = `<p style="text-align:center;color:#d32f2f;padding:30px;font-weight:700;">❌ Error al cargar técnicos.<br>Cierra y vuelve a intentar.</p>`;
+    })
+    .getTecnicos(folio);
 }
 
 function renderizarTecnicos() {

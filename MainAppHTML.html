@@ -882,7 +882,10 @@ function omAbrirModalMaquinas(){
   grupos.forEach(function(g){
     html += '<div style="background:#1a237e;color:white;padding:10px;font-weight:900;margin-top:15px;border-radius:8px;font-size:12px;">'+g+'</div>';
     filtradas.filter(function(m){ return m.grupo===g; }).forEach(function(m){
-      html += '<button style="display:block;width:100%;padding:14px;margin:6px 0;border:1px solid #eee;border-radius:10px;background:#fff;text-align:left;font-size:15px;font-weight:bold;cursor:pointer;" data-nombre="'+m.nombre+'" onclick="omSetMaquina(this.dataset.nombre)">'+m.nombre+'</button>';
+      html += '<button style="display:block;width:100%;padding:14px;margin:6px 0;border:1px solid #eee;border-radius:10px;background:#fff;text-align:left;font-size:15px;font-weight:bold;cursor:pointer;" data-nombre="'+m.nombre+'" data-desc="'+(m.descripcion||'')+'" onclick="omSetMaquina(this.dataset.nombre,this.dataset.desc)">'
+        +m.nombre
+        +(m.descripcion?'<div style="font-size:11px;color:#999;font-weight:400;margin-top:3px;">'+m.descripcion+'</div>':'')
+        +'</button>';
     });
   });
   var modal = document.createElement('div');
@@ -896,6 +899,7 @@ function omAbrirModalMaquinas(){
 
 function omSetMaquina(n){
   document.getElementById('om-maquina').value = n;
+  document.getElementById('om-maquina').dataset.desc = (arguments[1]||'');
   document.getElementById('omModalMaquinas').remove();
 }
 
@@ -935,7 +939,8 @@ function omGuardar(){
   document.getElementById('om-t-folio').innerText   = folio;
   document.getElementById('om-t-fecha').innerText   = new Date().toLocaleString();
   document.getElementById('om-t-area').innerText    = area;
-  document.getElementById('om-t-maquina').innerText = maq;
+  var maqDesc = document.getElementById('om-maquina').dataset.desc || '';
+  document.getElementById('om-t-maquina').innerHTML = maq + (maqDesc ? '<div style="font-size:13px;color:#666;font-weight:400;margin-top:2px;">'+maqDesc+'</div>' : '');
   document.getElementById('om-t-tm').innerText      = tm;
   document.getElementById('om-t-falla').innerText   = falla.toUpperCase();
   document.getElementById('om-t-tipo').innerText    = tipos;
@@ -998,7 +1003,7 @@ function loadGestion(prefijo,etiqueta){
     filtradas.forEach(ot=>{
       const c=ot.estado==='INICIADO'?'warning':'info';
       html+=`<tr><td><span class="fw-bold text-primary">${ot.folio}</span><br><small class="text-muted">${ot.fecha}</small></td>
-        <td><div class="fw-bold">${ot.maquina}</div><span class="badge bg-light text-dark border">${ot.tipo}</span></td>
+        <td><div class="fw-bold">${ot.maquina}</div>${ot.descripcion?`<div style="font-size:11px;color:#999;font-weight:400;">${ot.descripcion}</div>`:''}<span class="badge bg-light text-dark border">${ot.tipo}</span></td>
         <td style="max-width:280px"><small>${ot.falla}</small></td>
         <td><span class="status-pill bg-${c} text-${c}">${ot.estado}</span></td>
         <td><small class="${ot.tecnico?'fw-bold':'text-muted'}">${ot.tecnico||'PENDIENTE'}</small></td>
@@ -1110,7 +1115,7 @@ function buildOTPDF(d){
       </div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Equipo / Activo</label><span>${d.maquina||'—'}</span></div>
+      <div class="field"><label>Equipo / Activo</label><span>${d.maquina||'—'}${d.descripcion?`<div style="font-size:11px;color:#999;font-weight:400;margin-top:2px;">${d.descripcion}</div>`:''}</span></div>
       <div class="field"><label>Área</label><span>${d.area||'—'}</span></div>
       <div class="field"><label>Tipo</label><span>${d.tipo||'—'}</span></div>
       <div class="field"><label>Prioridad</label><span>${d.prioridad||'NORMAL'}</span></div>
