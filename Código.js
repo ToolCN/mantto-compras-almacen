@@ -373,10 +373,12 @@ function fuzzySteelMatch(steelA, steelB) {
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 function doPost(e) {
+  // ── GARANTÍA: siempre responder OK a Telegram primero ──
+  var respuestaOK = ContentService.createTextOutput("OK");
+  
   try {
     var contents = JSON.parse(e.postData.contents);
 
-    // ── Callback query (botones Aceptar/Rechazar) ──
     if (contents.callback_query) {
       var cbData = String(contents.callback_query.data || "");
       var cbId   = contents.callback_query.id;
@@ -394,17 +396,15 @@ function doPost(e) {
         procesarCallbackValidacion(contents.callback_query);
       }
 
-      return ContentService.createTextOutput("OK");
+      return respuestaOK;
     }
 
-    // ── Mensaje normal ──
-    if (!contents.message) return ContentService.createTextOutput("OK");
+    if (!contents.message) return respuestaOK;
 
     var chatId    = contents.message.chat.id;
     var text      = contents.message.text || "";
     var textLower = text.toLowerCase().trim();
 
-    // ── FILTRO: ignorar todo lo que no sea un comando conocido ──
     var esTest       = (textLower === "test");
     var esEstatus    = textLower.includes("estatus");
     var esReplyAcero = contents.message.reply_to_message &&
@@ -412,13 +412,11 @@ function doPost(e) {
                        (contents.message.reply_to_message.text.includes("ACERO INCORRECTO") ||
                         contents.message.reply_to_message.text.includes("SELLO NO EXISTE"));
 
-    if (!esTest && !esEstatus && !esReplyAcero) {
-      return ContentService.createTextOutput("OK");
-    }
+    if (!esTest && !esEstatus && !esReplyAcero) return respuestaOK;
 
     if (esTest) {
       enviarTextoTelegram_Interno(chatId, "✅ Conexión recuperada.", THREAD_ID_SELLOS);
-      return ContentService.createTextOutput("OK");
+      return respuestaOK;
     }
 
     if (esEstatus) {
@@ -428,19 +426,20 @@ function doPost(e) {
       if (key.length > 2) {
         enviarTextoTelegram_Interno(chatId, buscarEstatusPedidoBot_Integrado(key), null);
       }
-      return ContentService.createTextOutput("OK");
+      return respuestaOK;
     }
 
     if (esReplyAcero) {
       actualizarSelloDesdeTelegram(chatId, contents.message.reply_to_message.message_id, text.trim());
-      return ContentService.createTextOutput("OK");
+      return respuestaOK;
     }
 
   } catch (err) {
-    enviarTextoTelegram_Interno(CHAT_ID_CALIDAD, "❌ Error en doPost: " + err.toString(), THREAD_ID_SELLOS);
+    // Solo loguear, NO intentar enviar a Telegram (eso puede causar el ciclo infinito)
+    Logger.log("Error en doPost: " + err.toString());
   }
 
-  return ContentService.createTextOutput("OK");
+  return respuestaOK;
 }
 
 // NUEVA FUNCIÓN COMPLEMENTARIA (No afecta el flujo principal)
@@ -1400,21 +1399,19 @@ function guardarRequisicion(obj, archivoData) {
     
     var urlArchivo = "";
     
-    // Si hay archivo, intentar guardarlo
     if (archivoData && archivoData.base64 && archivoData.base64 !== "") {
       try {
         var folder = DriveApp.getFolderById(ID_CARPETA_ADJUNTOS);
-        var blob = Utilities.newBlob(Utilities.base64Decode(archivoData.base64), archivoData.type, archivoData.name);
+        var decoded = Utilities.base64Decode(archivoData.base64);
+        var blob = Utilities.newBlob(decoded, archivoData.type, archivoData.name);
         var file = folder.createFile(blob);
-        // Cambiar permisos para que cualquiera con el link lo vea (opcional)
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        // QUITAMOS setSharing — causa "Acceso denegado" en Workspace
         urlArchivo = file.getUrl();
       } catch(errDrive) {
         return "Error al subir archivo a Drive: " + errDrive.toString();
       }
     }
 
-    // Cabecera (Columnas A a K)
     sheetCab.appendRow([
       Utilities.getUuid(), 
       new Date(), 
@@ -1429,7 +1426,6 @@ function guardarRequisicion(obj, archivoData) {
       obj.msg_id || "" 
     ]);
 
-    // Partidas (Columnas A a N)
     obj.partidas.forEach(function(p, index) {
       sheetDet.appendRow([
         Utilities.getUuid(),           
@@ -2776,6 +2772,16 @@ function actualizarEstadoMP(id, nuevoEstado, infoSalida, nombreUsuario) {
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 function test2(){ DriveApp.getRootFolder(); }
 
+/////////// **************************************************************************** ////////////
+//// ******************Ejecutar en ete orden para resanar webhook****************************** /////
+/////////// **************************************************************************** ////////////
+function resetWebhook() {
+  // Borra el webhook Y descarta todos los updates pendientes
+  var url = "https://api.telegram.org/bot" + TOKEN + "/deleteWebhook?drop_pending_updates=true";
+  var response = UrlFetchApp.fetch(url);
+  console.log("deleteWebhook: " + response.getContentText());
+}
+
 function limpiarColaUpdates() {
   // 1. Obtener los updates pendientes
   var url = "https://api.telegram.org/bot" + TOKEN + "/getUpdates";
@@ -2801,22 +2807,25 @@ function limpiarColaUpdates() {
   console.log("✅ Cola limpiada correctamente");
 }
 
+function setWebhook() {
+  var urlWebApp = "https://script.google.com/macros/s/AKfycbzZcStBdIBWL6Zmot6u8uBD3X-tST7uCe6hJ1Iqqrv1FLZsH7HtyFjGz1J3GvfCiO8CBQ/exec";
+  var url = "https://api.telegram.org/bot" + TOKEN + "/setWebhook?url=" + urlWebApp + "&drop_pending_updates=true";
+  var response = UrlFetchApp.fetch(url);
+  console.log("setWebhook: " + response.getContentText());
+}
+
 function verWebhook() {
   var url = "https://api.telegram.org/bot" + TOKEN + "/getWebhookInfo";
   var response = UrlFetchApp.fetch(url);
   console.log(response.getContentText());
 }
 
-function resetWebhook() {
-  // Borra el webhook Y descarta todos los updates pendientes
-  var url = "https://api.telegram.org/bot" + TOKEN + "/deleteWebhook?drop_pending_updates=true";
-  var response = UrlFetchApp.fetch(url);
-  console.log("deleteWebhook: " + response.getContentText());
-}
+/////////// **************************************************************************** ////////////
 
-function setWebhook() {
-  var urlWebApp = "https://script.google.com/macros/s/AKfycbzZcStBdIBWL6Zmot6u8uBD3X-tST7uCe6hJ1Iqqrv1FLZsH7HtyFjGz1J3GvfCiO8CBQ/exec";
-  var url = "https://api.telegram.org/bot" + TOKEN + "/setWebhook?url=" + urlWebApp + "&drop_pending_updates=true";
-  var response = UrlFetchApp.fetch(url);
-  console.log("setWebhook: " + response.getContentText());
+function verCuota() {
+  var cuota = ScriptApp.getRemainingDailyTriggerMinutes ? 
+              "Tiene triggers avanzados (Workspace)" : 
+              "Cuenta básica";
+  Logger.log(cuota);
+  Logger.log("Usuario: " + Session.getActiveUser().getEmail());
 }
