@@ -375,14 +375,12 @@ function fuzzySteelMatch(steelA, steelB) {
 function doPost(e) {
   try {
     var contents = JSON.parse(e.postData.contents);
- 
-    // ── Callback query (botones inline de Telegram) ──
+
+    // ── Callback query (botones Aceptar/Rechazar) ──
     if (contents.callback_query) {
       var cbData = String(contents.callback_query.data || "");
       var cbId   = contents.callback_query.id;
- 
-      // CRÍTICO: responder a Telegram INMEDIATAMENTE antes de cualquier
-      // operación lenta. Esto evita que Telegram reintente el callback.
+
       try {
         UrlFetchApp.fetch("https://api.telegram.org/bot" + TOKEN + "/answerCallbackQuery", {
           method: "post",
@@ -391,30 +389,39 @@ function doPost(e) {
           muteHttpExceptions: true
         });
       } catch(eAns) { Logger.log("answerCallbackQuery error: " + eAns); }
- 
-      // Ahora sí procesar la acción (ya sin riesgo de loop)
+
       if (cbData.startsWith("VALIDA|")) {
         procesarCallbackValidacion(contents.callback_query);
       }
- 
+
       return ContentService.createTextOutput("OK");
     }
- 
+
     // ── Mensaje normal ──
     if (!contents.message) return ContentService.createTextOutput("OK");
- 
+
     var chatId    = contents.message.chat.id;
     var text      = contents.message.text || "";
     var textLower = text.toLowerCase().trim();
- 
-    registrarUsuarioTelegram(contents);
- 
-    if (textLower === "test") {
+
+    // ── FILTRO: ignorar todo lo que no sea un comando conocido ──
+    var esTest       = (textLower === "test");
+    var esEstatus    = textLower.includes("estatus");
+    var esReplyAcero = contents.message.reply_to_message &&
+                       contents.message.reply_to_message.text &&
+                       (contents.message.reply_to_message.text.includes("ACERO INCORRECTO") ||
+                        contents.message.reply_to_message.text.includes("SELLO NO EXISTE"));
+
+    if (!esTest && !esEstatus && !esReplyAcero) {
+      return ContentService.createTextOutput("OK");
+    }
+
+    if (esTest) {
       enviarTextoTelegram_Interno(chatId, "✅ Conexión recuperada.", THREAD_ID_SELLOS);
       return ContentService.createTextOutput("OK");
     }
- 
-    if (textLower.includes("estatus")) {
+
+    if (esEstatus) {
       var matchCodigo = text.match(/\d{9}/);
       var matchPedido = text.match(/(QSQ|ZEQ|XER|TEM)\s*(-?)\s*\d+/i);
       var key = matchCodigo ? matchCodigo[0] : (matchPedido ? matchPedido[0].replace(/\s+/g, "").toUpperCase() : "");
@@ -423,19 +430,16 @@ function doPost(e) {
       }
       return ContentService.createTextOutput("OK");
     }
- 
-    if (contents.message.reply_to_message) {
-      var original = contents.message.reply_to_message;
-      if (original.text && (original.text.includes("ACERO INCORRECTO") || original.text.includes("SELLO NO EXISTE"))) {
-        actualizarSelloDesdeTelegram(chatId, original.message_id, text.trim());
-        return ContentService.createTextOutput("OK");
-      }
+
+    if (esReplyAcero) {
+      actualizarSelloDesdeTelegram(chatId, contents.message.reply_to_message.message_id, text.trim());
+      return ContentService.createTextOutput("OK");
     }
- 
+
   } catch (err) {
     enviarTextoTelegram_Interno(CHAT_ID_CALIDAD, "❌ Error en doPost: " + err.toString(), THREAD_ID_SELLOS);
   }
- 
+
   return ContentService.createTextOutput("OK");
 }
 
@@ -2771,3 +2775,48 @@ function actualizarEstadoMP(id, nuevoEstado, infoSalida, nombreUsuario) {
 //////////// esto no me acuerdo para que era creo apra enlazar el DRIVE /////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 function test2(){ DriveApp.getRootFolder(); }
+
+function limpiarColaUpdates() {
+  // 1. Obtener los updates pendientes
+  var url = "https://api.telegram.org/bot" + TOKEN + "/getUpdates";
+  var response = UrlFetchApp.fetch(url);
+  var data = JSON.parse(response.getContentText());
+  
+  console.log("Updates pendientes: " + data.result.length);
+  
+  if (data.result.length === 0) {
+    console.log("No hay updates pendientes, la cola ya está limpia");
+    return;
+  }
+  
+  // 2. Tomar el ID del último update y sumarle 1
+  var ultimoId = data.result[data.result.length - 1].update_id;
+  console.log("Último update_id: " + ultimoId);
+  
+  // 3. Confirmar a Telegram que ya los procesamos todos
+  var urlConfirmar = "https://api.telegram.org/bot" + TOKEN + "/getUpdates?offset=" + (ultimoId + 1);
+  var respConfirmar = UrlFetchApp.fetch(urlConfirmar);
+  console.log("Respuesta confirmación: " + respConfirmar.getContentText());
+  
+  console.log("✅ Cola limpiada correctamente");
+}
+
+function verWebhook() {
+  var url = "https://api.telegram.org/bot" + TOKEN + "/getWebhookInfo";
+  var response = UrlFetchApp.fetch(url);
+  console.log(response.getContentText());
+}
+
+function resetWebhook() {
+  // Borra el webhook Y descarta todos los updates pendientes
+  var url = "https://api.telegram.org/bot" + TOKEN + "/deleteWebhook?drop_pending_updates=true";
+  var response = UrlFetchApp.fetch(url);
+  console.log("deleteWebhook: " + response.getContentText());
+}
+
+function setWebhook() {
+  var urlWebApp = "https://script.google.com/macros/s/AKfycbzZcStBdIBWL6Zmot6u8uBD3X-tST7uCe6hJ1Iqqrv1FLZsH7HtyFjGz1J3GvfCiO8CBQ/exec";
+  var url = "https://api.telegram.org/bot" + TOKEN + "/setWebhook?url=" + urlWebApp + "&drop_pending_updates=true";
+  var response = UrlFetchApp.fetch(url);
+  console.log("setWebhook: " + response.getContentText());
+}
